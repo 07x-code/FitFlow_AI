@@ -1,0 +1,16 @@
+import pytest
+from pydantic import ValidationError
+
+from app.domain.models import FitnessProfileCreate
+
+
+def test_profile_rejects_too_many_training_days():
+    with pytest.raises(ValidationError):
+        FitnessProfileCreate(
+            age=22,
+            height_cm=175,
+            weight_kg=70,
+            goal="muscle_gain",
+            sessions_per_week=8,
+            session_minutes=60,
+        )
