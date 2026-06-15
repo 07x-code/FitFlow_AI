@@ -8,9 +8,13 @@ class FitnessGoal(StrEnum):
     MUSCLE_GAIN = "muscle_gain"
     GENERAL_FITNESS = "general_fitness"
 
+class Sex(StrEnum):
+    MALE = "male"
+    FEMALE = "female"
 
 class FitnessProfileCreate(BaseModel):
     age: int = Field(ge=16, le=80)
+    sex: Sex
     height_cm: float = Field(ge=120, le=230)
     weight_kg: float = Field(ge=35, le=250)
     goal: FitnessGoal
