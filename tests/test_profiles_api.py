@@ -30,3 +30,15 @@ def test_create_profile_returns_risk_and_nutrition_assessment():
         "calorie_target_kcal": 2572,
         "protein_target_g": 112,
     }
+
+
+def test_create_profile_declares_response_model_in_openapi():
+    response = TestClient(app).get("/openapi.json")
+
+    assert response.status_code == 200
+    schema = response.json()
+    response_schema = schema["paths"]["/api/profiles"]["post"]["responses"]["201"]["content"][
+        "application/json"
+    ]["schema"]
+
+    assert response_schema == {"$ref": "#/components/schemas/ProfileAssessmentResponse"}

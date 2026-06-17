@@ -42,3 +42,22 @@ class WorkoutDayDraft(BaseModel):  #
 
 class TrainingPlanDraft(BaseModel):
     days: list[WorkoutDayDraft] = Field(min_length=1)
+
+
+
+#以下是回应数据格式
+class RiskAssessment(BaseModel):
+    level: str
+    can_auto_plan: bool
+
+
+class NutritionTargets(BaseModel):
+    bmr_kcal: int
+    calorie_target_kcal: int
+    protein_target_g: int
+
+
+class ProfileAssessmentResponse(BaseModel):
+    profile: FitnessProfileCreate
+    risk: RiskAssessment
+    nutrition: NutritionTargets
