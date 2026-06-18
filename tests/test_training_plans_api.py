@@ -211,6 +211,51 @@ def test_get_training_plan_detail_hides_other_users_plan():   #不能查看别�
     assert response.json()["detail"] == "Training plan not found."
 
 
+def test_get_training_plan_explanation_returns_rule_based_explanation():  #返回规则版训练计划解释
+    client = TestClient(app)
+    user_id = unique_user_id("explanation-plan-user")
+    save_profile(client, user_id)
+    plan_id = create_plan_and_get_id(client, user_id)
+
+    response = client.get(
+        f"/api/training-plans/{plan_id}/explanation",
+        headers={"X-User-ID": user_id},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["plan_id"] == plan_id
+    assert body["summary"] == "这是一个每周 3 天的新手全身训练计划。"
+    assert body["reasons"] == [
+        "训练天数来自你的用户画像，每周 3 天。",
+        "每天安排 4 个动作，符合新手安全范围。",
+        "所有动作的目标 RPE 都不超过 8，当前计划使用 RPE 7。",
+    ]
+    assert body["safety_notes"] == [
+        "如果出现胸痛、急性疼痛或明显不适，应停止训练并咨询专业人士。",
+        "这个解释来自后端规则，后续可以交给大模型润色，但不能绕过安全规则。",
+    ]
+
+
+def test_get_training_plan_explanation_hides_other_users_plan():   #不能查看别人的计划解释
+    client = TestClient(app)
+    owner_user_id = unique_user_id("explanation-owner-user")
+    other_user_id = unique_user_id("explanation-other-user")
+    save_profile(client, owner_user_id)
+    save_profile(client, other_user_id)
+    plan_id = create_plan_and_get_id(client, owner_user_id)
+
+    response = client.get(
+        f"/api/training-plans/{plan_id}/explanation",
+        headers={"X-User-ID": other_user_id},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Training plan not found."
+
+
+
+
 def test_get_training_plan_detail_returns_404_for_missing_plan():   #查询不存在的训练计划返回 404
     user_id = unique_user_id("detail-missing-user")
     response = TestClient(app).get(

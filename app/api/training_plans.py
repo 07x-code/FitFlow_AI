@@ -5,9 +5,11 @@ from fastapi import APIRouter, Header, HTTPException, status
 from app.domain.models import (
     SafetyCheckResult,
     TrainingPlanDraftResponse,
+    TrainingPlanExplanationResponse,
     TrainingPlanHistoryItem,
     TrainingPlanHistoryResponse,
 )
+from app.domain.plan_explainer import explain_training_plan
 from app.domain.plan_generator import generate_beginner_plan
 from app.domain.risk_rules import assess_risk
 from app.domain.training_rules import validate_beginner_plan
@@ -77,3 +79,15 @@ def get_training_plan_detail(
         raise HTTPException(status_code=404, detail="Training plan not found.")
 
     return plan
+
+
+@router.get("/{plan_id}/explanation", response_model=TrainingPlanExplanationResponse)
+def get_training_plan_explanation(
+    plan_id: int,
+    user_id: Annotated[str, Header(alias="X-User-ID")],
+) -> TrainingPlanExplanationResponse:
+    plan = training_plan_repository.get_by_id_for_user(user_id, plan_id)
+    if plan is None:
+        raise HTTPException(status_code=404, detail="Training plan not found.")
+
+    return explain_training_plan(plan)

@@ -65,6 +65,13 @@ class TrainingPlanHistoryResponse(BaseModel):
     plans: list[TrainingPlanHistoryItem]
 
 
+class TrainingPlanExplanationResponse(BaseModel):
+    plan_id: int
+    summary: str
+    reasons: list[str]
+    safety_notes: list[str]
+
+
 class RiskAssessment(BaseModel):
     level: str
     can_auto_plan: bool
