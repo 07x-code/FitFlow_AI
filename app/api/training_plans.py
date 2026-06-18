@@ -1,0 +1,50 @@
+from typing import Annotated
+
+from fastapi import APIRouter, Header, HTTPException, status
+
+from app.domain.models import TrainingPlanDraftResponse
+from app.domain.plan_generator import generate_beginner_plan
+from app.domain.risk_rules import assess_risk
+from app.domain.training_rules import validate_beginner_plan
+from app.infrastructure.profile_repository import ProfileRepository
+
+
+router = APIRouter(prefix="/api/training-plans", tags=["training-plans"])
+
+profile_repository = ProfileRepository()
+
+
+@router.post(
+    "/draft",
+    response_model=TrainingPlanDraftResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_training_plan_draft(
+    user_id: Annotated[str, Header(alias="X-User-ID")],
+) -> TrainingPlanDraftResponse:
+    profile = profile_repository.get(user_id)
+    if profile is None:
+        raise HTTPException(status_code=404, detail="Profile not found.")
+
+    risk = assess_risk(profile)
+    if risk["can_auto_plan"] is False:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "message": "Automatic plan generation is blocked.",
+                "risk": risk,
+            },
+        )
+
+    plan = generate_beginner_plan(profile)
+    safety_check = validate_beginner_plan(plan)
+    if safety_check["valid"] is False:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "message": "Generated plan failed safety check.",
+                "safety_check": safety_check,
+            },
+        )
+
+    return TrainingPlanDraftResponse(plan=plan, safety_check=safety_check)

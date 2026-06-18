@@ -3,7 +3,7 @@ from enum import StrEnum
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class FitnessGoal(StrEnum): #训练目标
+class FitnessGoal(StrEnum):
     FAT_LOSS = "fat_loss"
     MUSCLE_GAIN = "muscle_gain"
     GENERAL_FITNESS = "general_fitness"
@@ -14,7 +14,7 @@ class Sex(StrEnum):
     FEMALE = "female"
 
 
-class FitnessProfileCreate(BaseModel):  #健身档案创建
+class FitnessProfileCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     age: int = Field(ge=16, le=80)
@@ -27,7 +27,7 @@ class FitnessProfileCreate(BaseModel):  #健身档案创建
     health_flags: list[str] = Field(default_factory=list)
 
 
-class ExercisePrescription(BaseModel):  #运动处方
+class ExercisePrescription(BaseModel):
     exercise_name: str = Field(min_length=1)
     sets: int = Field(ge=1, le=5)
     reps_min: int = Field(ge=1, le=30)
@@ -35,7 +35,7 @@ class ExercisePrescription(BaseModel):  #运动处方
     target_rpe: float = Field(ge=1, le=10)
 
 
-class WorkoutDayDraft(BaseModel):  #
+class WorkoutDayDraft(BaseModel):
     name: str = Field(min_length=1)
     exercises: list[ExercisePrescription] = Field(min_length=1)
 
@@ -44,8 +44,16 @@ class TrainingPlanDraft(BaseModel):
     days: list[WorkoutDayDraft] = Field(min_length=1)
 
 
+class SafetyCheckResult(BaseModel):
+    valid: bool
+    violations: list[dict[str, str]]
 
-#以下是回应数据格式
+
+class TrainingPlanDraftResponse(BaseModel):
+    plan: TrainingPlanDraft
+    safety_check: SafetyCheckResult
+
+
 class RiskAssessment(BaseModel):
     level: str
     can_auto_plan: bool
