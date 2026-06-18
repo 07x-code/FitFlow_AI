@@ -50,6 +50,26 @@ class TrainingPlanRepository:
 
         return [self._row_to_history_item(row) for row in rows]
 
+    def get_by_id_for_user(
+        self,
+        user_id: str,
+        plan_id: int,
+    ) -> TrainingPlanHistoryItem | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT id, plan_json, safety_check_json, created_at
+                FROM training_plans
+                WHERE user_id = ? AND id = ?
+                """,
+                (user_id, plan_id),
+            ).fetchone()
+
+        if row is None:
+            return None
+
+        return self._row_to_history_item(row)
+
     def _connect(self) -> sqlite3.Connection:
         return sqlite3.connect(self.db_path)
 

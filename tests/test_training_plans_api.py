@@ -32,6 +32,21 @@ def save_profile(
     assert response.status_code == 201
 
 
+def create_plan_and_get_id(client: TestClient, user_id: str) -> int:
+    draft_response = client.post(
+        "/api/training-plans/draft",
+        headers={"X-User-ID": user_id},
+    )
+    assert draft_response.status_code == 201
+
+    history_response = client.get(
+        "/api/training-plans/history",
+        headers={"X-User-ID": user_id},
+    )
+    assert history_response.status_code == 200
+    return history_response.json()["plans"][0]["id"]
+
+
 def test_create_training_plan_draft_returns_safe_plan_for_saved_profile():
     client = TestClient(app)
     user_id = unique_user_id("training-plan-user")
@@ -158,3 +173,50 @@ def test_blocked_training_plan_draft_does_not_save_history():
     assert draft_response.status_code == 409
     assert history_response.status_code == 200
     assert history_response.json() == {"plans": []}
+
+
+def test_get_training_plan_detail_returns_owned_plan():   #自己能查看自己的训练计划
+    client = TestClient(app)
+    user_id = unique_user_id("detail-plan-user")
+    save_profile(client, user_id)
+    plan_id = create_plan_and_get_id(client, user_id)
+
+    response = client.get(
+        f"/api/training-plans/{plan_id}",
+        headers={"X-User-ID": user_id},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["id"] == plan_id
+    assert body["plan"]["days"][0]["name"] == "Day 1 - Full Body A"
+    assert body["safety_check"] == {"valid": True, "violations": []}
+    assert "created_at" in body
+
+
+def test_get_training_plan_detail_hides_other_users_plan():   #不能查看别人的训练计划
+    client = TestClient(app)
+    owner_user_id = unique_user_id("detail-owner-user")
+    other_user_id = unique_user_id("detail-other-user")
+    save_profile(client, owner_user_id)
+    save_profile(client, other_user_id)
+    plan_id = create_plan_and_get_id(client, owner_user_id)
+
+    response = client.get(
+        f"/api/training-plans/{plan_id}",
+        headers={"X-User-ID": other_user_id},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Training plan not found."
+
+
+def test_get_training_plan_detail_returns_404_for_missing_plan():   #查询不存在的训练计划返回 404
+    user_id = unique_user_id("detail-missing-user")
+    response = TestClient(app).get(
+        "/api/training-plans/999999999",
+        headers={"X-User-ID": user_id},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Training plan not found."
