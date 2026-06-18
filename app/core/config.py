@@ -7,6 +7,8 @@ class AppSettings:
     llm_provider: str
     dashscope_api_key: str | None
     openai_api_key: str | None
+    dashscope_model: str
+    dashscope_base_url: str
 
     @classmethod
     def from_env(cls) -> "AppSettings":
@@ -14,6 +16,11 @@ class AppSettings:
             llm_provider=_read_env("FITFLOW_LLM_PROVIDER", default="fake").lower(),
             dashscope_api_key=_read_env("DASHSCOPE_API_KEY"),
             openai_api_key=_read_env("OPENAI_API_KEY"),
+            dashscope_model=_read_env("DASHSCOPE_MODEL", default="qwen-plus"),
+            dashscope_base_url=_read_env(
+                "DASHSCOPE_BASE_URL",
+                default="https://dashscope.aliyuncs.com/compatible-mode/v1",
+            ),
         )
 
     @property
