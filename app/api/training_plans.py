@@ -14,14 +14,14 @@ from app.domain.risk_rules import assess_risk
 from app.domain.training_rules import validate_beginner_plan
 from app.infrastructure.profile_repository import ProfileRepository
 from app.infrastructure.training_plan_repository import TrainingPlanRepository
-from app.services.coach_explainer import RuleBasedCoachExplainer
+from app.services.coach_explainer import create_coach_explainer
 
 
 router = APIRouter(prefix="/api/training-plans", tags=["training-plans"])
 
 profile_repository = ProfileRepository()
 training_plan_repository = TrainingPlanRepository()
-coach_explainer = RuleBasedCoachExplainer()
+coach_explainer = create_coach_explainer()
 
 
 @router.post(
