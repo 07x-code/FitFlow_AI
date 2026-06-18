@@ -265,3 +265,14 @@ def test_get_training_plan_detail_returns_404_for_missing_plan():   #查询不�
 
     assert response.status_code == 404
     assert response.json()["detail"] == "Training plan not found."
+
+
+def test_get_training_plan_explanation_returns_404_for_missing_plan():
+    user_id = unique_user_id("explanation-missing-user")
+    response = TestClient(app).get(
+        "/api/training-plans/999999999/explanation",
+        headers={"X-User-ID": user_id},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Training plan not found."

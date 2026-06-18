@@ -9,18 +9,19 @@ from app.domain.models import (
     TrainingPlanHistoryItem,
     TrainingPlanHistoryResponse,
 )
-from app.domain.plan_explainer import explain_training_plan
 from app.domain.plan_generator import generate_beginner_plan
 from app.domain.risk_rules import assess_risk
 from app.domain.training_rules import validate_beginner_plan
 from app.infrastructure.profile_repository import ProfileRepository
 from app.infrastructure.training_plan_repository import TrainingPlanRepository
+from app.services.coach_explainer import RuleBasedCoachExplainer
 
 
 router = APIRouter(prefix="/api/training-plans", tags=["training-plans"])
 
 profile_repository = ProfileRepository()
 training_plan_repository = TrainingPlanRepository()
+coach_explainer = RuleBasedCoachExplainer()
 
 
 @router.post(
@@ -90,4 +91,4 @@ def get_training_plan_explanation(
     if plan is None:
         raise HTTPException(status_code=404, detail="Training plan not found.")
 
-    return explain_training_plan(plan)
+    return coach_explainer.explain_training_plan(plan)
