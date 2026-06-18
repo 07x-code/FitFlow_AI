@@ -2,16 +2,22 @@ from typing import Annotated
 
 from fastapi import APIRouter, Header, HTTPException, status
 
-from app.domain.models import TrainingPlanDraftResponse
+from app.domain.models import (
+    SafetyCheckResult,
+    TrainingPlanDraftResponse,
+    TrainingPlanHistoryResponse,
+)
 from app.domain.plan_generator import generate_beginner_plan
 from app.domain.risk_rules import assess_risk
 from app.domain.training_rules import validate_beginner_plan
 from app.infrastructure.profile_repository import ProfileRepository
+from app.infrastructure.training_plan_repository import TrainingPlanRepository
 
 
 router = APIRouter(prefix="/api/training-plans", tags=["training-plans"])
 
 profile_repository = ProfileRepository()
+training_plan_repository = TrainingPlanRepository()
 
 
 @router.post(
@@ -37,14 +43,24 @@ def create_training_plan_draft(
         )
 
     plan = generate_beginner_plan(profile)
-    safety_check = validate_beginner_plan(plan)
-    if safety_check["valid"] is False:
+    safety_check = SafetyCheckResult.model_validate(validate_beginner_plan(plan))
+    if safety_check.valid is False:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail={
                 "message": "Generated plan failed safety check.",
-                "safety_check": safety_check,
+                "safety_check": safety_check.model_dump(),
             },
         )
 
+    training_plan_repository.save(user_id, plan, safety_check)
     return TrainingPlanDraftResponse(plan=plan, safety_check=safety_check)
+
+
+@router.get("/history", response_model=TrainingPlanHistoryResponse)
+def list_training_plan_history(
+    user_id: Annotated[str, Header(alias="X-User-ID")],
+) -> TrainingPlanHistoryResponse:
+    return TrainingPlanHistoryResponse(
+        plans=training_plan_repository.list_by_user(user_id)
+    )

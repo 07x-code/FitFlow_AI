@@ -54,6 +54,17 @@ class TrainingPlanDraftResponse(BaseModel):
     safety_check: SafetyCheckResult
 
 
+class TrainingPlanHistoryItem(BaseModel):
+    id: int
+    plan: TrainingPlanDraft
+    safety_check: SafetyCheckResult
+    created_at: str
+
+
+class TrainingPlanHistoryResponse(BaseModel):
+    plans: list[TrainingPlanHistoryItem]
+
+
 class RiskAssessment(BaseModel):
     level: str
     can_auto_plan: bool
