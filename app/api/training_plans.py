@@ -3,18 +3,15 @@ from typing import Annotated
 from fastapi import APIRouter, Header, HTTPException, status
 
 from app.domain.models import (
-    SafetyCheckResult,
     TrainingPlanDraftResponse,
     TrainingPlanExplanationResponse,
     TrainingPlanHistoryItem,
     TrainingPlanHistoryResponse,
 )
-from app.domain.plan_generator import generate_beginner_plan
-from app.domain.risk_rules import assess_risk
-from app.domain.training_rules import validate_beginner_plan
 from app.infrastructure.profile_repository import ProfileRepository
 from app.infrastructure.training_plan_repository import TrainingPlanRepository
 from app.services.coach_explainer import create_coach_explainer
+from app.workflows.training_plan_workflow import create_training_plan_workflow
 
 
 router = APIRouter(prefix="/api/training-plans", tags=["training-plans"])
@@ -22,6 +19,10 @@ router = APIRouter(prefix="/api/training-plans", tags=["training-plans"])
 profile_repository = ProfileRepository()
 training_plan_repository = TrainingPlanRepository()
 coach_explainer = create_coach_explainer()
+training_plan_workflow = create_training_plan_workflow(
+    profile_repository=profile_repository,
+    training_plan_repository=training_plan_repository,
+)
 
 
 @router.post(
@@ -32,33 +33,14 @@ coach_explainer = create_coach_explainer()
 def create_training_plan_draft(
     user_id: Annotated[str, Header(alias="X-User-ID")],
 ) -> TrainingPlanDraftResponse:
-    profile = profile_repository.get(user_id)
-    if profile is None:
-        raise HTTPException(status_code=404, detail="Profile not found.")
-
-    risk = assess_risk(profile)
-    if risk["can_auto_plan"] is False:
+    result = training_plan_workflow.run(user_id)
+    if result.response is None:
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail={
-                "message": "Automatic plan generation is blocked.",
-                "risk": risk,
-            },
+            status_code=result.status_code,
+            detail=result.error_detail,
         )
 
-    plan = generate_beginner_plan(profile)
-    safety_check = SafetyCheckResult.model_validate(validate_beginner_plan(plan))
-    if safety_check.valid is False:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail={
-                "message": "Generated plan failed safety check.",
-                "safety_check": safety_check.model_dump(),
-            },
-        )
-
-    training_plan_repository.save(user_id, plan, safety_check)
-    return TrainingPlanDraftResponse(plan=plan, safety_check=safety_check)
+    return result.response
 
 
 @router.get("/history", response_model=TrainingPlanHistoryResponse)
