@@ -72,6 +72,16 @@ class TrainingPlanExplanationResponse(BaseModel):
     safety_notes: list[str]
 
 
+class CoachChatRequest(BaseModel):
+    message: str = Field(min_length=1, max_length=1000)
+
+
+class CoachChatResponse(BaseModel):
+    answer: str
+    safety_level: str
+    referenced_plan_id: int | None = None
+
+
 class RiskAssessment(BaseModel):
     level: str
     can_auto_plan: bool
