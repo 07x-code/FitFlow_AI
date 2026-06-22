@@ -72,6 +72,41 @@ class TrainingPlanExplanationResponse(BaseModel):
     safety_notes: list[str]
 
 
+class ProposalType(StrEnum):
+    TRAINING_PLAN = "training_plan"
+
+
+class ProposalStatus(StrEnum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+
+class ProposalDecision(StrEnum):
+    APPROVE = "approve"
+    REJECT = "reject"
+
+
+class ProposalDecisionRequest(BaseModel):
+    decision: ProposalDecision
+    decision_note: str | None = Field(default=None, max_length=500)
+
+
+class TrainingPlanProposalResponse(BaseModel):
+    id: int
+    type: ProposalType
+    status: ProposalStatus
+    plan: TrainingPlanDraft
+    safety_check: SafetyCheckResult
+    approved_plan_id: int | None = None
+    decision_note: str | None = None
+    created_at: str
+    decided_at: str | None = None
+
+
+class ProposalListResponse(BaseModel):
+    proposals: list[TrainingPlanProposalResponse]
+
 class CoachChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=1000)
 
