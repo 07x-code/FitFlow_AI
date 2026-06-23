@@ -1,4 +1,4 @@
-from enum import StrEnum
+﻿from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -152,6 +152,22 @@ class WorkoutSessionResponse(BaseModel):
 
 class WorkoutHistoryResponse(BaseModel):
     sessions: list[WorkoutSessionResponse]
+
+class WeeklyReportMetrics(BaseModel):
+    #周报报告指标
+    session_count: int
+    completed_sessions: int
+    completion_rate: float
+    average_rpe: float | None = None
+    average_fatigue: float | None = None
+    max_pain: int | None = None
+
+
+class WeeklyReportResponse(BaseModel):
+    #周报告响应
+    metrics: WeeklyReportMetrics
+    recommendation: str
+    adjustment_proposal: TrainingPlanProposalResponse | None = None
 
 class RiskAssessment(BaseModel):
     level: str

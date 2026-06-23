@@ -66,6 +66,7 @@ class WorkoutSessionRepository:
         return self._row_to_session(row)
 
     def list_by_user(self, user_id: str) -> list[WorkoutSessionResponse]:
+        #查某个用户的所有训练打卡记录
         with self._connect() as connection:
             rows = connection.execute(
                 """
@@ -83,7 +84,7 @@ class WorkoutSessionRepository:
                 WHERE user_id = ?
                 ORDER BY id DESC
                 """,
-                (user_id,),
+                (user_id,), #？的传值
             ).fetchall()
 
         return [self._row_to_session(row) for row in rows]
@@ -116,7 +117,7 @@ class WorkoutSessionRepository:
                 """
             )
 
-    def _fetch_by_id(
+    def _fetch_by_id( #查某一条训练打卡记录
         self,
         connection: sqlite3.Connection,
         session_id: int,
@@ -139,7 +140,7 @@ class WorkoutSessionRepository:
             (session_id,),
         ).fetchone()
 
-    def _row_to_session(
+    def _row_to_session(#转换成 Pydantic 模型
         self,
         row: tuple[int, int, int, int, int, str | None, str, str | None, str],
     ) -> WorkoutSessionResponse:
