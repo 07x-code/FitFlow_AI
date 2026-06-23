@@ -117,6 +117,42 @@ class CoachChatResponse(BaseModel):
     referenced_plan_id: int | None = None
 
 
+class WorkoutSetLog(BaseModel):
+    exercise_name: str = Field(min_length=1)
+    set_number: int = Field(ge=1, le=20)
+    weight_kg: float = Field(ge=0, le=500)
+    reps: int = Field(ge=0, le=100)
+    rpe: float = Field(ge=1, le=10)
+
+
+class WorkoutSafetyAlert(BaseModel):
+    level: str
+    message: str
+
+
+class WorkoutSessionCreate(BaseModel):
+    completed: bool
+    fatigue_level: int = Field(ge=1, le=10)
+    pain_level: int = Field(ge=0, le=10)
+    notes: str | None = Field(default=None, max_length=1000)
+    sets: list[WorkoutSetLog] = Field(min_length=1)
+
+
+class WorkoutSessionResponse(BaseModel):
+    id: int
+    plan_id: int
+    completed: bool
+    fatigue_level: int
+    pain_level: int
+    notes: str | None = None
+    sets: list[WorkoutSetLog]
+    safety_alert: WorkoutSafetyAlert | None = None
+    created_at: str
+
+
+class WorkoutHistoryResponse(BaseModel):
+    sessions: list[WorkoutSessionResponse]
+
 class RiskAssessment(BaseModel):
     level: str
     can_auto_plan: bool
