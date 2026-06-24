@@ -107,6 +107,38 @@ class TrainingPlanProposalResponse(BaseModel):
 class ProposalListResponse(BaseModel):
     proposals: list[TrainingPlanProposalResponse]
 
+
+class MemoryType(StrEnum):
+    #记忆类别
+    PREFERRED_EQUIPMENT = "preferred_equipment"
+    DISLIKED_EXERCISE = "disliked_exercise"
+    TRAINING_TIME = "training_time"
+    PHYSICAL_LIMITATION = "physical_limitation"
+    GENERAL_NOTE = "general_note"
+
+
+class UserMemoryCreate(BaseModel):
+    #创建用户记忆请求
+    model_config = ConfigDict(extra="forbid")
+
+    type: MemoryType
+    content: str = Field(min_length=1, max_length=500)
+    source: str = Field(default="user", pattern="^user$")
+
+
+class UserMemoryResponse(BaseModel):
+    #单条用户记忆响应
+    id: int
+    type: MemoryType
+    content: str
+    source: str
+    created_at: str
+
+
+class UserMemoryListResponse(BaseModel):
+    memories: list[UserMemoryResponse]
+
+
 class CoachChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=1000)
 
@@ -153,6 +185,7 @@ class WorkoutSessionResponse(BaseModel):
 class WorkoutHistoryResponse(BaseModel):
     sessions: list[WorkoutSessionResponse]
 
+
 class WeeklyReportMetrics(BaseModel):
     #周报报告指标
     session_count: int
@@ -168,6 +201,7 @@ class WeeklyReportResponse(BaseModel):
     metrics: WeeklyReportMetrics
     recommendation: str
     adjustment_proposal: TrainingPlanProposalResponse | None = None
+
 
 class RiskAssessment(BaseModel):
     level: str
