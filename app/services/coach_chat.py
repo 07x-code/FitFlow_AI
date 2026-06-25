@@ -3,7 +3,9 @@ from dataclasses import dataclass
 from app.domain.models import (
     CoachChatRequest,
     CoachChatResponse,
+    FitnessKnowledgeItem,
     FitnessProfileCreate,
+    KnowledgeSource,
     TrainingPlanHistoryItem,
     UserMemoryResponse,
 )
@@ -11,6 +13,7 @@ from app.domain.risk_rules import assess_risk
 from app.infrastructure.profile_repository import ProfileRepository
 from app.infrastructure.training_plan_repository import TrainingPlanRepository
 from app.infrastructure.user_memory_repository import UserMemoryRepository
+from app.services.knowledge_retriever import KnowledgeRetriever
 from app.services.llm_provider import LLMProvider, create_llm_provider
 
 
@@ -19,6 +22,7 @@ class CoachChatService:
     profile_repository: ProfileRepository
     training_plan_repository: TrainingPlanRepository
     memory_repository: UserMemoryRepository
+    knowledge_retriever: KnowledgeRetriever
     llm_provider: LLMProvider
 
     def chat(self, user_id: str, request: CoachChatRequest) -> CoachChatResponse | None:
@@ -39,11 +43,13 @@ class CoachChatService:
 
         latest_plan = self._get_latest_plan(user_id)
         memories = self.memory_repository.list_by_user(user_id)
+        knowledge_items = self.knowledge_retriever.retrieve(request.message)
         completion = self.llm_provider.complete(
             _build_coach_chat_prompt(
                 profile=profile,
                 latest_plan=latest_plan,
                 memories=memories,
+                knowledge_items=knowledge_items,
                 risk_level=str(risk["level"]),
                 message=request.message,
             )
@@ -53,6 +59,14 @@ class CoachChatService:
             answer=completion.content.strip(),
             safety_level=str(risk["level"]),
             referenced_plan_id=latest_plan.id if latest_plan is not None else None,
+            knowledge_sources=[
+                KnowledgeSource(
+                    title=item.title,
+                    category=item.category,
+                    summary=item.summary,
+                )
+                for item in knowledge_items
+            ],
         )
 
     def _get_latest_plan(self, user_id: str) -> TrainingPlanHistoryItem | None:
@@ -68,11 +82,15 @@ def create_coach_chat_service(
     training_plan_repository: TrainingPlanRepository,
     llm_provider: LLMProvider | None = None,
     memory_repository: UserMemoryRepository | None = None,
+    knowledge_retriever: KnowledgeRetriever | None = None,
 ) -> CoachChatService:
     return CoachChatService(
         profile_repository=profile_repository,
         training_plan_repository=training_plan_repository,
         memory_repository=memory_repository or UserMemoryRepository(),
+        knowledge_retriever=(
+            knowledge_retriever or KnowledgeRetriever.from_default_file()
+        ),
         llm_provider=llm_provider or create_llm_provider(),
     )
 
@@ -82,6 +100,7 @@ def _build_coach_chat_prompt(
     profile: FitnessProfileCreate,
     latest_plan: TrainingPlanHistoryItem | None,
     memories: list[UserMemoryResponse],
+    knowledge_items: list[FitnessKnowledgeItem],
     risk_level: str,
     message: str,
 ) -> str:
@@ -98,7 +117,19 @@ def _build_coach_chat_prompt(
         memory_context = "\n".join(
             f"- {memory.type}: {memory.content}" for memory in memories
         )
-    return (
+
+    knowledge_context = "未检索到与当前问题直接相关的本地健身知识。"
+    if knowledge_items:
+        knowledge_context = "\n".join(
+            (
+                f"- 标题：{item.title}\n"
+                f"  分类：{item.category}\n"
+                f"  内容：{item.content}"
+            )
+            for item in knowledge_items
+        )
+
+    prompt = (
         "你是 FitFlow AI 的健身教练，请基于后端已经通过安全规则的上下文回答用户。\n"
         "要求：不要诊断疾病，不要提供康复处方，不要绕过安全规则；"
         "如果问题涉及疼痛、胸痛、急性损伤或明显不适，要提醒停止训练并咨询专业人士。\n\n"
@@ -109,3 +140,4 @@ def _build_coach_chat_prompt(
         f"长期记忆：\n{memory_context}\n"
         f"训练计划上下文：{latest_plan_context}"
     )
+    return f"{prompt}\n健身知识库依据：\n{knowledge_context}"

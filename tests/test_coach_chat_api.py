@@ -88,6 +88,7 @@ def test_coach_chat_blocks_risky_profile_without_calling_llm():
         ),
         "safety_level": "blocked",
         "referenced_plan_id": None,
+        "knowledge_sources": [],
     }
 
 
@@ -102,3 +103,43 @@ def test_coach_chat_requires_saved_profile():
 
     assert response.status_code == 404
     assert response.json()["detail"] == "Profile not found."
+
+
+def test_coach_chat_returns_rpe_knowledge_source_and_uses_content_in_prompt():
+    #相关问题 → 返回匹配知识
+    client = TestClient(app)
+    user_id = unique_user_id("coach-rag-rpe-user")
+    save_profile(client, user_id)
+
+    response = client.post(
+        "/api/coach/chat",
+        headers={"X-User-ID": user_id},
+        json={"message": "RPE 是什么？"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["knowledge_sources"] == [
+        {
+            "title": "RPE 基础说明",
+            "category": "训练强度",
+            "summary": "使用 RPE 衡量训练强度，初学者通常无需频繁练到力竭。",
+        }
+    ]
+    assert "RPE 7 表示大约还能完成 3 次重复" in body["answer"]
+
+
+def test_coach_chat_returns_no_sources_for_unrelated_question():
+    #不相关问题 → 返回空知识
+    client = TestClient(app)
+    user_id = unique_user_id("coach-rag-unrelated-user")
+    save_profile(client, user_id)
+
+    response = client.post(
+        "/api/coach/chat",
+        headers={"X-User-ID": user_id},
+        json={"message": "Python 的装饰器是什么？"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["knowledge_sources"] == []

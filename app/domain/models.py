@@ -139,6 +139,24 @@ class UserMemoryListResponse(BaseModel):
     memories: list[UserMemoryResponse]
 
 
+class FitnessKnowledgeItem(BaseModel):
+    #健身知识项目数据模型
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(min_length=1)
+    title: str = Field(min_length=1)
+    category: str = Field(min_length=1)
+    keywords: list[str] = Field(min_length=1)
+    content: str = Field(min_length=1)
+    summary: str = Field(min_length=1)
+
+
+class KnowledgeSource(BaseModel):
+    title: str
+    category: str
+    summary: str
+
+
 class CoachChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=1000)
 
@@ -147,6 +165,7 @@ class CoachChatResponse(BaseModel):
     answer: str
     safety_level: str
     referenced_plan_id: int | None = None
+    knowledge_sources: list[KnowledgeSource] = Field(default_factory=list)
 
 
 class WorkoutSetLog(BaseModel):
