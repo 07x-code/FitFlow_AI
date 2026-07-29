@@ -12,7 +12,7 @@ class DuplicateToolError(ValueError):
 
 
 class ToolRegistry:
-    """Register, discover, and execute agent capabilities by stable name."""
+    """通过稳定名称注册、发现并执行 Agent 能力。"""
 
     def __init__(self) -> None:
         self._tools: dict[str, Tool[Any, Any]] = {}

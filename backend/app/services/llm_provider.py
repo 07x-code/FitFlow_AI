@@ -18,7 +18,12 @@ class LLMProvider(Protocol):
     model: str
 
     def complete(self, prompt: str) -> LLMCompletion:
-        """Return one completion for a prompt."""
+        """
+        根据提示词返回一次模型补全结果。
+
+        :param prompt: 发送给大模型的完整提示词。
+        :return: 包含回复内容、服务商和模型名称的补全结果。
+        """
 
 
 class FakeLLMProvider:

@@ -46,10 +46,10 @@ class TrainingPlanAgentResult:
 
 
 class TrainingPlanAgent(Agent[str, TrainingPlanAgentResult]):
-    """Plan-and-solve agent with deterministic safety gates.
+    """带有确定性安全门禁的规划与求解 Agent。
 
-    LangGraph handles orchestration while every domain capability is exposed
-    through the same registry used by the conversational agent.
+    LangGraph 负责流程编排，同时每项领域能力都通过统一工具注册中心暴露，
+    该注册中心也供对话 Agent 使用。
     """
 
     def __init__(

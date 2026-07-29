@@ -1,7 +1,7 @@
-"""FitFlow agent layer.
+"""FitFlow Agent 层。
 
-The package follows the lightweight HelloAgents structure: a small agent core,
-specialized agents, and a registry of explicit tools.
+本包采用轻量化的 HelloAgents 结构：小型 Agent 核心、
+专用 Agent，以及职责明确的工具注册中心。
 """
 
 from app.agents.core import Agent, AgentConfig, AgentMessage

@@ -12,7 +12,12 @@ class CoachExplainer(Protocol):
         self,
         plan: TrainingPlanHistoryItem,
     ) -> TrainingPlanExplanationResponse:
-        """Explain a saved training plan without changing safety decisions."""
+        """
+        解释已保存的训练计划，但不改变任何安全判定。
+
+        :param plan: 已保存且通过安全检查的训练计划。
+        :return: 包含总结、设计原因和安全提示的计划解释。
+        """
 
 
 class RuleBasedCoachExplainer:

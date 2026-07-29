@@ -11,10 +11,10 @@ OutputT = TypeVar("OutputT")
 
 @dataclass(frozen=True)
 class AgentConfig:
-    """Runtime behavior shared by all FitFlow agents.
+    """所有 FitFlow Agent 共享的运行时配置。
 
-    API agents are singletons, so conversation history is disabled by default
-    to prevent one user's messages from leaking into another user's request.
+    API 中的 Agent 以单例方式运行，因此默认关闭进程内对话历史，
+    防止不同用户的消息在请求之间发生泄漏。
     """
 
     keep_history: bool = False
@@ -26,7 +26,7 @@ class AgentConfig:
 
 
 class Agent(ABC, Generic[InputT, OutputT]):
-    """Common execution contract inspired by HelloAgents' Agent base class."""
+    """参考 HelloAgents 的 Agent 基类定义通用执行契约。"""
 
     def __init__(
         self,
@@ -42,7 +42,13 @@ class Agent(ABC, Generic[InputT, OutputT]):
 
     @abstractmethod
     def run(self, agent_input: InputT, **kwargs: object) -> OutputT:
-        """Run the agent using its specialized input and output contract."""
+        """
+        按照当前 Agent 的专用输入输出契约执行任务。
+
+        :param agent_input: 当前 Agent 需要处理的输入。
+        :param kwargs: 具体 Agent 可选的扩展参数。
+        :return: 当前 Agent 的执行结果。
+        """
 
     def add_message(self, message: AgentMessage) -> None:
         if not self.config.keep_history:

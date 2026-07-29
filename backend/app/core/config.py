@@ -1,5 +1,47 @@
 import os
 from dataclasses import dataclass
+from pathlib import Path
+
+
+DEFAULT_ENV_PATH = Path(__file__).resolve().parents[2] / ".env"
+
+
+def _load_env_file(path: str | Path = DEFAULT_ENV_PATH) -> None:
+    """
+    加载简单的 KEY=VALUE 配置，且不覆盖终端中已有的环境变量。
+
+    :param path: 环境变量文件路径，默认指向 backend/.env。
+    :return: 无返回值。
+    """
+
+    env_path = Path(path)
+    if not env_path.is_file():
+        return
+
+    for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("export "):
+            line = line[7:].lstrip()
+
+        name, separator, value = line.partition("=")
+        name = name.strip()
+        if not separator or not name or not name.replace("_", "").isalnum():
+            continue
+
+        value = value.strip()
+        if (
+            len(value) >= 2
+            and value[0] == value[-1]
+            and value[0] in {"'", '"'}
+        ):
+            value = value[1:-1]
+
+        os.environ.setdefault(name, value)
+
+
+_load_env_file()
 
 
 @dataclass(frozen=True)

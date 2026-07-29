@@ -1,6 +1,6 @@
-"""Backward-compatible imports for the pre-agent service API.
+"""为重构前的 Agent 服务接口保留向后兼容导入。
 
-New code should import from :mod:`app.agents.coach_agent`.
+新代码应从 :mod:`app.agents.coach_agent` 导入。
 """
 
 from app.agents.coach_agent import (

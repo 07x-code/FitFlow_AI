@@ -47,11 +47,11 @@ class GetProfileTool(Tool[str, FitnessProfileCreate | None]):
     def __init__(self, repository: ProfileRepository) -> None:
         super().__init__(
             name=GET_PROFILE_TOOL,
-            description="Load the user's validated fitness profile.",
+            description="加载用户已校验的健身画像。",
             parameters=(
                 ToolParameter(
                     name="user_id",
-                    description="Stable FitFlow user identifier.",
+                    description="稳定的 FitFlow 用户标识。",
                 ),
             ),
         )
@@ -65,11 +65,11 @@ class AssessRiskTool(Tool[FitnessProfileCreate, RiskAssessment]):
     def __init__(self) -> None:
         super().__init__(
             name=ASSESS_RISK_TOOL,
-            description="Apply deterministic health-risk rules to a profile.",
+            description="对用户画像应用确定性的健康风险规则。",
             parameters=(
                 ToolParameter(
                     name="profile",
-                    description="Validated fitness profile.",
+                    description="已校验的健身画像。",
                     type_name="FitnessProfileCreate",
                 ),
             ),
@@ -85,11 +85,11 @@ class GenerateTrainingPlanTool(
     def __init__(self) -> None:
         super().__init__(
             name=GENERATE_TRAINING_PLAN_TOOL,
-            description="Generate a deterministic beginner training plan.",
+            description="生成确定性的初学者训练计划。",
             parameters=(
                 ToolParameter(
                     name="profile",
-                    description="Low-risk validated fitness profile.",
+                    description="已校验的低风险健身画像。",
                     type_name="FitnessProfileCreate",
                 ),
             ),
@@ -105,11 +105,11 @@ class ValidateTrainingPlanTool(
     def __init__(self) -> None:
         super().__init__(
             name=VALIDATE_TRAINING_PLAN_TOOL,
-            description="Check a generated plan against beginner safety rules.",
+            description="按照初学者安全规则检查生成的训练计划。",
             parameters=(
                 ToolParameter(
                     name="plan",
-                    description="Generated training plan.",
+                    description="已生成的训练计划。",
                     type_name="TrainingPlanDraft",
                 ),
             ),
@@ -125,11 +125,11 @@ class SaveTrainingPlanTool(
     def __init__(self, repository: TrainingPlanRepository) -> None:
         super().__init__(
             name=SAVE_TRAINING_PLAN_TOOL,
-            description="Persist a plan only after a successful safety check.",
+            description="仅在安全检查通过后持久化训练计划。",
             parameters=(
                 ToolParameter(
                     name="input",
-                    description="User, plan, and safety-check bundle.",
+                    description="用户、训练计划与安全检查结果的组合输入。",
                     type_name="SaveTrainingPlanInput",
                 ),
             ),
@@ -153,11 +153,11 @@ class GetLatestTrainingPlanTool(
     def __init__(self, repository: TrainingPlanRepository) -> None:
         super().__init__(
             name=GET_LATEST_TRAINING_PLAN_TOOL,
-            description="Load the user's most recently generated training plan.",
+            description="加载用户最近生成的训练计划。",
             parameters=(
                 ToolParameter(
                     name="user_id",
-                    description="Stable FitFlow user identifier.",
+                    description="稳定的 FitFlow 用户标识。",
                 ),
             ),
         )
@@ -172,11 +172,11 @@ class RecallUserMemoryTool(Tool[str, list[UserMemoryResponse]]):
     def __init__(self, repository: UserMemoryRepository) -> None:
         super().__init__(
             name=RECALL_USER_MEMORY_TOOL,
-            description="Recall explicit long-term memories saved for a user.",
+            description="召回为用户保存的显式长期记忆。",
             parameters=(
                 ToolParameter(
                     name="user_id",
-                    description="Stable FitFlow user identifier.",
+                    description="稳定的 FitFlow 用户标识。",
                 ),
             ),
         )
@@ -192,15 +192,15 @@ class RetrieveFitnessKnowledgeTool(
     def __init__(self, retriever: KnowledgeRetriever) -> None:
         super().__init__(
             name=RETRIEVE_FITNESS_KNOWLEDGE_TOOL,
-            description="Retrieve relevant entries from the local fitness RAG store.",
+            description="从本地健身 RAG 知识库中检索相关条目。",
             parameters=(
                 ToolParameter(
                     name="query",
-                    description="User's fitness question.",
+                    description="用户的健身问题。",
                 ),
                 ToolParameter(
                     name="limit",
-                    description="Maximum number of knowledge entries.",
+                    description="最多返回的知识条目数量。",
                     type_name="integer",
                     required=False,
                     default=3,

@@ -7,7 +7,7 @@ MessageRole = Literal["system", "user", "assistant", "tool"]
 
 @dataclass(frozen=True)
 class AgentMessage:
-    """One framework-neutral message in an agent conversation."""
+    """表示 Agent 对话中的一条框架无关消息。"""
 
     role: MessageRole
     content: str

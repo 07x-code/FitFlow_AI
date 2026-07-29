@@ -17,7 +17,7 @@ class ToolParameter:
 
 
 class Tool(ABC, Generic[InputT, OutputT]):
-    """A discoverable, directly executable capability."""
+    """表示一个可发现、可直接执行的能力。"""
 
     def __init__(
         self,
@@ -32,7 +32,12 @@ class Tool(ABC, Generic[InputT, OutputT]):
 
     @abstractmethod
     def run(self, tool_input: InputT) -> OutputT:
-        """Execute the tool."""
+        """
+        执行该工具。
+
+        :param tool_input: 工具执行所需的输入。
+        :return: 工具执行结果。
+        """
 
     def describe(self) -> str:
         if not self.parameters:
@@ -47,7 +52,7 @@ class Tool(ABC, Generic[InputT, OutputT]):
 
 
 class FunctionTool(Tool[InputT, OutputT]):
-    """Adapter for registering a small function as a tool."""
+    """用于把小型函数注册为工具的适配器。"""
 
     def __init__(
         self,

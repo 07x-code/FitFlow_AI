@@ -42,7 +42,7 @@ class CoachAgentInput:
 
 
 class CoachAgent(Agent[CoachAgentInput, CoachChatResponse | None]):
-    """Tool-using conversational agent with deterministic risk gating."""
+    """使用工具并带有确定性风险门禁的对话 Agent。"""
 
     def __init__(
         self,
@@ -143,7 +143,13 @@ class CoachAgent(Agent[CoachAgentInput, CoachChatResponse | None]):
         user_id: str,
         request: CoachChatRequest,
     ) -> CoachChatResponse | None:
-        """Compatibility-friendly API for the existing FastAPI endpoint."""
+        """
+        为现有 FastAPI 接口保留兼容的对话调用入口。
+
+        :param user_id: 当前用户的稳定标识。
+        :param request: 用户提交的教练对话请求。
+        :return: 教练回复；用户画像不存在时返回 None。
+        """
 
         return self.run(CoachAgentInput(user_id=user_id, request=request))
 
