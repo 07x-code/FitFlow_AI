@@ -1,28 +1,18 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Header, HTTPException, status
+from fastapi import APIRouter, Depends, Header, status
 
+from app.api.dependencies import get_training_plan_use_cases
+from app.application.use_cases.training_plans import TrainingPlanUseCases
 from app.domain.models import (
     TrainingPlanDraftResponse,
     TrainingPlanExplanationResponse,
     TrainingPlanHistoryItem,
     TrainingPlanHistoryResponse,
 )
-from app.infrastructure.profile_repository import ProfileRepository
-from app.infrastructure.training_plan_repository import TrainingPlanRepository
-from app.services.coach_explainer import create_coach_explainer
-from app.agents.training_plan_agent import create_training_plan_agent
 
 
 router = APIRouter(prefix="/api/training-plans", tags=["training-plans"])
-
-profile_repository = ProfileRepository()
-training_plan_repository = TrainingPlanRepository()
-coach_explainer = create_coach_explainer()
-training_plan_agent = create_training_plan_agent(
-    profile_repository=profile_repository,
-    training_plan_repository=training_plan_repository,
-)
 
 
 @router.post(
@@ -32,45 +22,44 @@ training_plan_agent = create_training_plan_agent(
 )
 def create_training_plan_draft(
     user_id: Annotated[str, Header(alias="X-User-ID")],
+    use_cases: Annotated[
+        TrainingPlanUseCases,
+        Depends(get_training_plan_use_cases),
+    ],
 ) -> TrainingPlanDraftResponse:
-    result = training_plan_agent.run(user_id)
-    if result.response is None:
-        raise HTTPException(
-            status_code=result.status_code,
-            detail=result.error_detail,
-        )
-
-    return result.response
+    return use_cases.create_draft(user_id)
 
 
 @router.get("/history", response_model=TrainingPlanHistoryResponse)
 def list_training_plan_history(
     user_id: Annotated[str, Header(alias="X-User-ID")],
+    use_cases: Annotated[
+        TrainingPlanUseCases,
+        Depends(get_training_plan_use_cases),
+    ],
 ) -> TrainingPlanHistoryResponse:
-    return TrainingPlanHistoryResponse(
-        plans=training_plan_repository.list_by_user(user_id)
-    )
+    return use_cases.list_history(user_id)
 
 
 @router.get("/{plan_id}", response_model=TrainingPlanHistoryItem)
 def get_training_plan_detail(
     plan_id: int,
     user_id: Annotated[str, Header(alias="X-User-ID")],
+    use_cases: Annotated[
+        TrainingPlanUseCases,
+        Depends(get_training_plan_use_cases),
+    ],
 ) -> TrainingPlanHistoryItem:
-    plan = training_plan_repository.get_by_id_for_user(user_id, plan_id)
-    if plan is None:
-        raise HTTPException(status_code=404, detail="Training plan not found.")
-
-    return plan
+    return use_cases.get_detail(user_id, plan_id)
 
 
 @router.get("/{plan_id}/explanation", response_model=TrainingPlanExplanationResponse)
 def get_training_plan_explanation(
     plan_id: int,
     user_id: Annotated[str, Header(alias="X-User-ID")],
+    use_cases: Annotated[
+        TrainingPlanUseCases,
+        Depends(get_training_plan_use_cases),
+    ],
 ) -> TrainingPlanExplanationResponse:
-    plan = training_plan_repository.get_by_id_for_user(user_id, plan_id)
-    if plan is None:
-        raise HTTPException(status_code=404, detail="Training plan not found.")
-
-    return coach_explainer.explain_training_plan(plan)
+    return use_cases.explain(user_id, plan_id)

@@ -1,29 +1,9 @@
 import json
 from dataclasses import dataclass
-from typing import Protocol
 from urllib import error, request
 
 from app.core.config import AppSettings
-
-
-@dataclass(frozen=True)
-class LLMCompletion:
-    content: str
-    provider: str
-    model: str
-
-
-class LLMProvider(Protocol):
-    name: str
-    model: str
-
-    def complete(self, prompt: str) -> LLMCompletion:
-        """
-        根据提示词返回一次模型补全结果。
-
-        :param prompt: 发送给大模型的完整提示词。
-        :return: 包含回复内容、服务商和模型名称的补全结果。
-        """
+from app.ports.llm import LLMCompletion, LLMProvider
 
 
 class FakeLLMProvider:

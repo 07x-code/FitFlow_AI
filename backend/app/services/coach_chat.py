@@ -13,7 +13,7 @@ from app.infrastructure.profile_repository import ProfileRepository
 from app.infrastructure.training_plan_repository import TrainingPlanRepository
 from app.infrastructure.user_memory_repository import UserMemoryRepository
 from app.services.knowledge_retriever import KnowledgeRetriever
-from app.services.llm_provider import LLMProvider
+from app.services.llm_provider import LLMProvider, create_llm_provider
 
 
 CoachChatService = CoachAgent
@@ -31,8 +31,8 @@ def create_coach_chat_service(
     return create_coach_agent(
         profile_repository=profile_repository,
         training_plan_repository=training_plan_repository,
-        llm_provider=llm_provider,
-        memory_repository=memory_repository,
-        knowledge_retriever=knowledge_retriever,
+        llm_provider=llm_provider or create_llm_provider(),
+        memory_repository=memory_repository or UserMemoryRepository(),
+        knowledge_retriever=knowledge_retriever or KnowledgeRetriever.from_default_file(),
         tool_registry=tool_registry,
     )
