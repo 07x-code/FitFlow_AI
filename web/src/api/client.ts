@@ -7,6 +7,19 @@ type RequestOptions = {
   body?: unknown;
 };
 
+export type KnowledgeSource = {
+  title: string;
+  category: string;
+  summary: string;
+};
+
+export type CoachChatResponse = {
+  answer: string;
+  safety_level: string;
+  referenced_plan_id: number | null;
+  knowledge_sources: KnowledgeSource[];
+};
+
 export class FitFlowApiError extends Error {
   constructor(
     message: string,
@@ -62,7 +75,7 @@ export const fitFlowApi = {
   createTrainingPlan: (userId: string) =>
     request('/api/training-plans/draft', { method: 'POST', userId }),
   chatWithCoach: (userId: string, message: string) =>
-    request('/api/coach/chat', {
+    request<CoachChatResponse>('/api/coach/chat', {
       method: 'POST',
       userId,
       body: { message },
