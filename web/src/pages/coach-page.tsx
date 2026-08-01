@@ -53,7 +53,7 @@ const suggestions = [
 function describeError(error: unknown) {
   if (error instanceof FitFlowApiError) {
     if (error.status === 404) {
-      return `后端未找到 ${USER_ID} 的用户画像。请先用现有 Streamlit 流程保存该用户画像。`;
+      return `后端未找到 ${USER_ID} 的用户画像。请先在 React PWA 的用户画像页面保存该用户画像。`;
     }
 
     if (error.status === 422) {

@@ -98,7 +98,10 @@ def test_coach_chat_includes_user_memories_in_prompt():
 
     chat_response = client.post(
         "/api/coach/chat",
-        headers={"X-User-ID": user_id},
+        headers={
+            "X-User-ID": user_id,
+            "X-Session-ID": f"session-{uuid4().hex}",
+        },
         json={"message": "Can you adapt my next workout?"},
     )
 

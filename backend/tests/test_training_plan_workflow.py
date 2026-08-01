@@ -1,7 +1,7 @@
 from app.domain.models import FitnessProfileCreate
-from app.infrastructure.profile_repository import ProfileRepository
-from app.infrastructure.training_plan_repository import TrainingPlanRepository
-from app.workflows.training_plan_workflow import create_training_plan_workflow
+from app.infrastructure.persistence.sqlite.profile_repository import ProfileRepository
+from app.infrastructure.persistence.sqlite.training_plan_repository import TrainingPlanRepository
+from app.ai.agents.single.planner import create_training_plan_agent
 
 
 def save_profile(
@@ -29,7 +29,7 @@ def test_training_plan_workflow_saves_safe_plan_to_history(tmp_path):
     db_path = tmp_path / "fitflow.db"
     profile_repository = ProfileRepository(db_path)
     training_plan_repository = TrainingPlanRepository(db_path)
-    workflow = create_training_plan_workflow(
+    workflow = create_training_plan_agent(
         profile_repository=profile_repository,
         training_plan_repository=training_plan_repository,
     )
@@ -49,7 +49,7 @@ def test_training_plan_workflow_blocks_risky_profile_without_saving_history(tmp_
     db_path = tmp_path / "fitflow.db"
     profile_repository = ProfileRepository(db_path)
     training_plan_repository = TrainingPlanRepository(db_path)
-    workflow = create_training_plan_workflow(
+    workflow = create_training_plan_agent(
         profile_repository=profile_repository,
         training_plan_repository=training_plan_repository,
     )

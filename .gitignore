@@ -5,6 +5,6 @@ __pycache__/
 *.py[cod]
 data/*.db
 data/*.sqlite
-docs/
-
-README.md
+web/node_modules/
+web/dist/
+web/.vite/

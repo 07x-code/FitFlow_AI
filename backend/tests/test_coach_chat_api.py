@@ -9,6 +9,13 @@ def unique_user_id(prefix: str) -> str:
     return f"{prefix}-{uuid4().hex}"
 
 
+def coach_headers(user_id: str) -> dict[str, str]:
+    return {
+        "X-User-ID": user_id,
+        "X-Session-ID": f"session-{uuid4().hex}",
+    }
+
+
 def save_profile(
     client: TestClient,
     user_id: str,
@@ -56,7 +63,7 @@ def test_coach_chat_answers_with_latest_plan_context():
 
     response = client.post(
         "/api/coach/chat",
-        headers={"X-User-ID": user_id},
+        headers=coach_headers(user_id),
         json={"message": "Why is my plan 3 days per week?"},
     )
 
@@ -75,7 +82,7 @@ def test_coach_chat_blocks_risky_profile_without_calling_llm():
 
     response = client.post(
         "/api/coach/chat",
-        headers={"X-User-ID": user_id},
+        headers=coach_headers(user_id),
         json={"message": "Can I train chest today?"},
     )
 
@@ -97,7 +104,7 @@ def test_coach_chat_requires_saved_profile():
 
     response = TestClient(app).post(
         "/api/coach/chat",
-        headers={"X-User-ID": user_id},
+        headers=coach_headers(user_id),
         json={"message": "Can you explain my plan?"},
     )
 
@@ -106,14 +113,13 @@ def test_coach_chat_requires_saved_profile():
 
 
 def test_coach_chat_returns_rpe_knowledge_source_and_uses_content_in_prompt():
-    #相关问题 → 返回匹配知识
     client = TestClient(app)
     user_id = unique_user_id("coach-rag-rpe-user")
     save_profile(client, user_id)
 
     response = client.post(
         "/api/coach/chat",
-        headers={"X-User-ID": user_id},
+        headers=coach_headers(user_id),
         json={"message": "RPE 是什么？"},
     )
 
@@ -130,14 +136,13 @@ def test_coach_chat_returns_rpe_knowledge_source_and_uses_content_in_prompt():
 
 
 def test_coach_chat_returns_no_sources_for_unrelated_question():
-    #不相关问题 → 返回空知识
     client = TestClient(app)
     user_id = unique_user_id("coach-rag-unrelated-user")
     save_profile(client, user_id)
 
     response = client.post(
         "/api/coach/chat",
-        headers={"X-User-ID": user_id},
+        headers=coach_headers(user_id),
         json={"message": "Python 的装饰器是什么？"},
     )
 

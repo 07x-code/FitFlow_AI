@@ -40,12 +40,14 @@ class CoachAgentPort(Protocol):
     def chat(
         self,
         user_id: str,
+        session_id: str,
         request: CoachChatRequest,
     ) -> CoachChatResponse | None:
         """
         处理一次 AI 教练对话。
 
         :param user_id: 用户标识。
+        :param session_id: 会话标识。
         :param request: 教练对话请求。
         :return: 教练回复；用户画像不存在时返回 None。
         """

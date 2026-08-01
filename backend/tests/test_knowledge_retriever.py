@@ -1,6 +1,6 @@
 import pytest
 
-from app.services.knowledge_retriever import KnowledgeRetriever
+from app.infrastructure.knowledge.retriever import KnowledgeRetriever
 
 
 def test_retrieve_matches_rpe_knowledge():

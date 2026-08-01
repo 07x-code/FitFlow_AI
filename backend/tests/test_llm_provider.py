@@ -3,7 +3,7 @@ import json
 import pytest
 
 from app.core.config import AppSettings
-from app.services.llm_provider import (
+from app.infrastructure.llm.provider import (
     DashScopeLLMProvider,
     DryRunLLMProvider,
     FakeLLMProvider,

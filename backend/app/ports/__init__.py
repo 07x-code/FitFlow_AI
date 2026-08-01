@@ -15,6 +15,7 @@ from app.ports.repositories import (
     UserMemoryRepositoryPort,
     WorkoutSessionRepositoryPort,
 )
+from app.ports.working_memory import WorkingMemoryStorePort
 
 __all__ = [
     "CoachAgentPort",
@@ -28,5 +29,6 @@ __all__ = [
     "TrainingPlanProposalRepositoryPort",
     "TrainingPlanRepositoryPort",
     "UserMemoryRepositoryPort",
+    "WorkingMemoryStorePort",
     "WorkoutSessionRepositoryPort",
 ]

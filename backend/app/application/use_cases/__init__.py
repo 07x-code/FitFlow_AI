@@ -6,6 +6,7 @@ from app.application.use_cases.profiles import ProfileUseCases
 from app.application.use_cases.proposals import ProposalUseCases
 from app.application.use_cases.reports import ReportUseCases
 from app.application.use_cases.training_plans import TrainingPlanUseCases
+from app.application.use_cases.working_memory import WorkingMemoryUseCases
 from app.application.use_cases.workouts import WorkoutUseCases
 
 __all__ = [
@@ -15,5 +16,6 @@ __all__ = [
     "ProposalUseCases",
     "ReportUseCases",
     "TrainingPlanUseCases",
+    "WorkingMemoryUseCases",
     "WorkoutUseCases",
 ]

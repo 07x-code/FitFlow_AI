@@ -51,9 +51,18 @@ class AppSettings:
     openai_api_key: str | None
     dashscope_model: str
     dashscope_base_url: str
+    working_memory_backend: str = "memory"
+    redis_url: str = "redis://127.0.0.1:6379/0"
+    working_memory_ttl_seconds: int = 7200
+    working_memory_capacity: int = 40
 
     @classmethod
     def from_env(cls) -> "AppSettings":
+        """
+        从环境变量创建应用配置。
+
+        :return: 已解析的应用配置。
+        """
         return cls(
             llm_provider=_read_env("FITFLOW_LLM_PROVIDER", default="fake").lower(),
             dashscope_api_key=_read_env("DASHSCOPE_API_KEY"),
@@ -63,21 +72,75 @@ class AppSettings:
                 "DASHSCOPE_BASE_URL",
                 default="https://dashscope.aliyuncs.com/compatible-mode/v1",
             ),
+            working_memory_backend=_read_env(
+                "FITFLOW_WORKING_MEMORY_BACKEND",
+                default="memory",
+            ).lower(),
+            redis_url=_read_env(
+                "FITFLOW_REDIS_URL",
+                default="redis://127.0.0.1:6379/0",
+            ),
+            working_memory_ttl_seconds=_read_positive_int(
+                "FITFLOW_WORKING_MEMORY_TTL_SECONDS",
+                default=7200,
+            ),
+            working_memory_capacity=_read_positive_int(
+                "FITFLOW_WORKING_MEMORY_CAPACITY",
+                default=40,
+            ),
         )
 
     @property
     def has_dashscope_api_key(self) -> bool:
+        """
+        判断是否已配置 DashScope API Key。
+
+        :return: 已配置时返回 True，否则返回 False。
+        """
         return bool(self.dashscope_api_key)
 
     @property
     def has_openai_api_key(self) -> bool:
+        """
+        判断是否已配置 OpenAI API Key。
+
+        :return: 已配置时返回 True，否则返回 False。
+        """
         return bool(self.openai_api_key)
 
 
 def _read_env(name: str, default: str | None = None) -> str | None:
+    """
+    读取并清理单个环境变量。
+
+    :param name: 环境变量名称。
+    :param default: 环境变量缺失时使用的默认值。
+    :return: 清理后的字符串；没有有效值时返回 None。
+    """
     value = os.getenv(name, default)
     if value is None:
         return None
 
     value = value.strip()
     return value or None
+
+
+def _read_positive_int(name: str, *, default: int) -> int:
+    """
+    读取正整数环境变量。
+
+    :param name: 环境变量名称。
+    :param default: 环境变量缺失时使用的默认值。
+    :return: 解析后的正整数。
+    """
+    raw_value = _read_env(name)
+    if raw_value is None:
+        return default
+
+    try:
+        value = int(raw_value)
+    except ValueError as exc:
+        raise ValueError(f"{name} must be a positive integer") from exc
+    if value < 1:
+        raise ValueError(f"{name} must be a positive integer")
+    return value

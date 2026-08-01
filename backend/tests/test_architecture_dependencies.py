@@ -5,13 +5,26 @@ import pytest
 
 
 APP_ROOT = Path(__file__).resolve().parents[1] / "app"
+PROJECT_ROOT = APP_ROOT.parents[1]
 
 
 def _python_files(layer: str) -> list[Path]:
+    """
+    返回指定应用层中的 Python 文件。
+
+    :param layer: 应用层目录名称。
+    :return: 按路径排序的 Python 文件列表。
+    """
     return sorted((APP_ROOT / layer).rglob("*.py"))
 
 
 def _app_imports(path: Path) -> set[str]:
+    """
+    提取文件中的应用内部导入。
+
+    :param path: 待分析的 Python 文件。
+    :return: 以 app 开头的导入模块集合。
+    """
     tree = ast.parse(path.read_text(encoding="utf-8-sig"))
     imports: set[str] = set()
     for node in ast.walk(tree):
@@ -36,10 +49,8 @@ def _app_imports(path: Path) -> set[str]:
                 "app.api",
                 "app.application",
                 "app.ai",
-                "app.agents",
                 "app.bootstrap",
                 "app.infrastructure",
-                "app.services",
             ),
         ),
         (
@@ -54,15 +65,6 @@ def _app_imports(path: Path) -> set[str]:
             "ai",
             (
                 "app.api",
-                "app.agents",
-                "app.bootstrap",
-                "app.infrastructure",
-            ),
-        ),
-        (
-            "agents",
-            (
-                "app.api",
                 "app.bootstrap",
                 "app.infrastructure",
             ),
@@ -73,11 +75,9 @@ def _app_imports(path: Path) -> set[str]:
                 "app.api",
                 "app.application",
                 "app.ai",
-                "app.agents",
                 "app.bootstrap",
                 "app.infrastructure",
                 "app.ports",
-                "app.services",
             ),
         ),
     ],
@@ -100,11 +100,9 @@ def test_api_routes_only_depend_on_application_boundaries() -> None:
     violations: list[str] = []
     ignored_files = {"__init__.py", "dependencies.py", "errors.py"}
     forbidden_prefixes = (
-        "app.agents",
         "app.ai",
         "app.bootstrap",
         "app.infrastructure",
-        "app.services",
     )
 
     for path in _python_files("api"):
@@ -142,9 +140,34 @@ def test_api_does_not_instantiate_repositories() -> None:
     assert violations == []
 
 
-def test_arc01_layer_directories_exist() -> None:
+def test_target_layer_directories_exist() -> None:
+    expected = {
+        "application",
+        "ai",
+        "ports",
+        "bootstrap",
+        "infrastructure",
+    }
     assert {
-        layer
-        for layer in ("application", "ai", "ports", "bootstrap")
-        if (APP_ROOT / layer).is_dir()
-    } == {"application", "ai", "ports", "bootstrap"}
+        layer for layer in expected if (APP_ROOT / layer).is_dir()
+    } == expected
+
+
+def test_legacy_compatibility_directories_are_removed() -> None:
+    assert not (PROJECT_ROOT / "frontend").exists()
+    assert not (APP_ROOT / "agents").exists()
+    assert not (APP_ROOT / "services").exists()
+    assert not (APP_ROOT / "workflows").exists()
+
+
+def test_sqlite_repositories_are_grouped_under_persistence() -> None:
+    sqlite_root = APP_ROOT / "infrastructure" / "persistence" / "sqlite"
+    assert {
+        path.name for path in sqlite_root.glob("*_repository.py")
+    } == {
+        "profile_repository.py",
+        "proposal_repository.py",
+        "training_plan_repository.py",
+        "user_memory_repository.py",
+        "workout_repository.py",
+    }

@@ -4,6 +4,9 @@ from pathlib import Path
 
 from app.ai.agents.single.coach import create_coach_agent
 from app.ai.agents.single.planner import create_training_plan_agent
+from app.ai.services.training_plan_explainer import (
+    create_training_plan_explainer,
+)
 from app.application.use_cases import (
     CoachUseCases,
     MemoryUseCases,
@@ -11,17 +14,21 @@ from app.application.use_cases import (
     ProposalUseCases,
     ReportUseCases,
     TrainingPlanUseCases,
+    WorkingMemoryUseCases,
     WorkoutUseCases,
 )
 from app.core.config import AppSettings
-from app.infrastructure.profile_repository import DEFAULT_DB_PATH, ProfileRepository
-from app.infrastructure.proposal_repository import TrainingPlanProposalRepository
-from app.infrastructure.training_plan_repository import TrainingPlanRepository
-from app.infrastructure.user_memory_repository import UserMemoryRepository
-from app.infrastructure.workout_repository import WorkoutSessionRepository
-from app.services.coach_explainer import create_coach_explainer
-from app.services.knowledge_retriever import KnowledgeRetriever
-from app.services.llm_provider import create_llm_provider
+from app.infrastructure.knowledge.retriever import KnowledgeRetriever
+from app.infrastructure.llm.provider import create_llm_provider
+from app.infrastructure.memory.factory import create_working_memory_store
+from app.infrastructure.persistence.sqlite import (
+    DEFAULT_DB_PATH,
+    ProfileRepository,
+    TrainingPlanProposalRepository,
+    TrainingPlanRepository,
+    UserMemoryRepository,
+    WorkoutSessionRepository,
+)
 
 
 @dataclass(frozen=True)
@@ -31,6 +38,7 @@ class ApplicationContainer:
     profiles: ProfileUseCases
     training_plans: TrainingPlanUseCases
     memories: MemoryUseCases
+    working_memory: WorkingMemoryUseCases
     coach: CoachUseCases
     proposals: ProposalUseCases
     workouts: WorkoutUseCases
@@ -58,6 +66,7 @@ def create_container(
     workout_repository = WorkoutSessionRepository(db_path)
     knowledge_retriever = KnowledgeRetriever.from_default_file()
     llm_provider = create_llm_provider(settings)
+    working_memory_store = create_working_memory_store(settings)
 
     training_plan_agent = create_training_plan_agent(
         profile_repository=profile_repository,
@@ -69,17 +78,19 @@ def create_container(
         memory_repository=memory_repository,
         knowledge_retriever=knowledge_retriever,
         llm_provider=llm_provider,
+        working_memory=working_memory_store,
     )
-    coach_explainer = create_coach_explainer(settings)
+    training_plan_explainer = create_training_plan_explainer(llm_provider)
 
     return ApplicationContainer(
         profiles=ProfileUseCases(profile_repository),
         training_plans=TrainingPlanUseCases(
             repository=training_plan_repository,
             agent=training_plan_agent,
-            explainer=coach_explainer,
+            explainer=training_plan_explainer,
         ),
         memories=MemoryUseCases(memory_repository),
+        working_memory=WorkingMemoryUseCases(working_memory_store),
         coach=CoachUseCases(coach_agent),
         proposals=ProposalUseCases(
             profiles=profile_repository,

@@ -1,18 +1,19 @@
-from app.agents.coach_agent import create_coach_agent
-from app.agents.tools.fitness import (
+from app.ai.agents.single.coach import create_coach_agent
+from app.ai.tools.fitness import (
     ASSESS_RISK_TOOL,
     GENERATE_TRAINING_PLAN_TOOL,
     GET_PROFILE_TOOL,
     SAVE_TRAINING_PLAN_TOOL,
     VALIDATE_TRAINING_PLAN_TOOL,
 )
-from app.agents.training_plan_agent import create_training_plan_agent
+from app.ai.agents.single.planner import create_training_plan_agent
 from app.domain.models import CoachChatRequest, FitnessProfileCreate
-from app.infrastructure.profile_repository import ProfileRepository
-from app.infrastructure.training_plan_repository import TrainingPlanRepository
-from app.infrastructure.user_memory_repository import UserMemoryRepository
-from app.services.knowledge_retriever import KnowledgeRetriever
-from app.services.llm_provider import FakeLLMProvider
+from app.infrastructure.memory.in_memory import InMemoryWorkingMemoryStore
+from app.infrastructure.persistence.sqlite.profile_repository import ProfileRepository
+from app.infrastructure.persistence.sqlite.training_plan_repository import TrainingPlanRepository
+from app.infrastructure.persistence.sqlite.user_memory_repository import UserMemoryRepository
+from app.infrastructure.knowledge.retriever import KnowledgeRetriever
+from app.infrastructure.llm.provider import FakeLLMProvider
 
 
 def build_profile(*, health_flags: list[str] | None = None) -> FitnessProfileCreate:
@@ -66,6 +67,7 @@ def test_coach_agent_uses_tools_but_keeps_llm_out_of_blocked_path(tmp_path):
     db_path = tmp_path / "fitflow.db"
     profiles = ProfileRepository(db_path)
     plans = TrainingPlanRepository(db_path)
+    working_memory = InMemoryWorkingMemoryStore()
     profiles.save("blocked-user", build_profile(health_flags=["chest_pain"]))
     agent = create_coach_agent(
         profile_repository=profiles,
@@ -73,10 +75,12 @@ def test_coach_agent_uses_tools_but_keeps_llm_out_of_blocked_path(tmp_path):
         memory_repository=UserMemoryRepository(db_path),
         knowledge_retriever=KnowledgeRetriever.from_default_file(),
         llm_provider=FakeLLMProvider(),
+        working_memory=working_memory,
     )
 
     response = agent.chat(
         "blocked-user",
+        "blocked-session",
         CoachChatRequest(message="Can I train today?"),
     )
 
@@ -84,3 +88,6 @@ def test_coach_agent_uses_tools_but_keeps_llm_out_of_blocked_path(tmp_path):
     assert response.safety_level == "blocked"
     assert response.referenced_plan_id is None
     assert agent.get_history() == ()
+    assert {
+        item.kind for item in working_memory.list("blocked-user", "blocked-session")
+    } == {"message", "tool_observation"}

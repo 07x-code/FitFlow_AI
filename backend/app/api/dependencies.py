@@ -5,6 +5,7 @@ from app.application.use_cases import (
     ProposalUseCases,
     ReportUseCases,
     TrainingPlanUseCases,
+    WorkingMemoryUseCases,
     WorkoutUseCases,
 )
 from app.bootstrap.container import get_container
@@ -35,6 +36,15 @@ def get_memory_use_cases() -> MemoryUseCases:
     :return: 用户记忆应用用例。
     """
     return get_container().memories
+
+
+def get_working_memory_use_cases() -> WorkingMemoryUseCases:
+    """
+    获取工作记忆应用用例。
+
+    :return: 工作记忆应用用例。
+    """
+    return get_container().working_memory
 
 
 def get_coach_use_cases() -> CoachUseCases:

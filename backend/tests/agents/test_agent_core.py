@@ -1,7 +1,7 @@
 import pytest
 
-from app.agents.core import Agent, AgentConfig
-from app.agents.tools import (
+from app.ai.core import Agent, AgentConfig
+from app.ai.tools import (
     DuplicateToolError,
     ToolNotFoundError,
     ToolRegistry,

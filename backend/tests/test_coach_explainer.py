@@ -1,4 +1,8 @@
-from app.core.config import AppSettings
+from app.ai.services.training_plan_explainer import (
+    LLMCoachExplainer,
+    RuleBasedCoachExplainer,
+    create_training_plan_explainer,
+)
 from app.domain.models import (
     ExercisePrescription,
     SafetyCheckResult,
@@ -6,15 +10,13 @@ from app.domain.models import (
     TrainingPlanHistoryItem,
     WorkoutDayDraft,
 )
-from app.services.coach_explainer import (
-    LLMCoachExplainer,
-    RuleBasedCoachExplainer,
-    create_coach_explainer,
-)
-from app.services.llm_provider import LLMCompletion
+from app.infrastructure.llm.provider import FakeLLMProvider
+from app.ports.llm import LLMCompletion
 
 
 class CapturingLLMProvider:
+    """记录提示词的测试用大模型 Provider。"""
+
     name = "dashscope"
     model = "qwen-test"
 
@@ -22,6 +24,12 @@ class CapturingLLMProvider:
         self.prompts: list[str] = []
 
     def complete(self, prompt: str) -> LLMCompletion:
+        """
+        记录提示词并返回固定回复。
+
+        :param prompt: 待记录的大模型提示词。
+        :return: 固定的测试回复。
+        """
         self.prompts.append(prompt)
         return LLMCompletion(
             content="LLM 润色后的训练计划总结。",
@@ -31,6 +39,12 @@ class CapturingLLMProvider:
 
 
 def exercise(name: str) -> ExercisePrescription:
+    """
+    创建测试使用的训练动作。
+
+    :param name: 动作名称。
+    :return: 固定训练参数的动作处方。
+    """
     return ExercisePrescription(
         exercise_name=name,
         sets=3,
@@ -41,6 +55,11 @@ def exercise(name: str) -> ExercisePrescription:
 
 
 def plan_history_item() -> TrainingPlanHistoryItem:
+    """
+    创建测试使用的已保存训练计划。
+
+    :return: 已通过安全校验的训练计划记录。
+    """
     return TrainingPlanHistoryItem(
         id=1,
         plan=TrainingPlanDraft(
@@ -62,8 +81,9 @@ def plan_history_item() -> TrainingPlanHistoryItem:
 
 
 def test_rule_based_coach_explainer_returns_plan_explanation():
-    #测试规则解释器
-    explanation = RuleBasedCoachExplainer().explain_training_plan(plan_history_item())
+    explanation = RuleBasedCoachExplainer().explain_training_plan(
+        plan_history_item()
+    )
 
     assert explanation.plan_id == 1
     assert explanation.summary == "这是一个每周 1 天的新手全身训练计划。"
@@ -74,7 +94,6 @@ def test_rule_based_coach_explainer_returns_plan_explanation():
 
 
 def test_llm_coach_explainer_polishes_summary_but_preserves_rule_facts():
-    #测试 LLM 解释器的核心安全原则
     plan = plan_history_item()
     rule_explainer = RuleBasedCoachExplainer()
     rule_explanation = rule_explainer.explain_training_plan(plan)
@@ -94,30 +113,13 @@ def test_llm_coach_explainer_polishes_summary_but_preserves_rule_facts():
     assert "不要新增训练动作" in llm_provider.prompts[0]
 
 
-def test_create_coach_explainer_uses_rule_based_explainer_for_fake_provider():
-    #测试工厂函数
-    explainer = create_coach_explainer(
-        AppSettings(
-            llm_provider="fake",
-            dashscope_api_key=None,
-            openai_api_key=None,
-            dashscope_model="qwen-plus",
-            dashscope_base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
-        )
-    )
+def test_factory_uses_rule_based_explainer_for_fake_provider():
+    explainer = create_training_plan_explainer(FakeLLMProvider())
 
     assert isinstance(explainer, RuleBasedCoachExplainer)
 
 
-def test_create_coach_explainer_uses_llm_explainer_for_dashscope_provider():
-    explainer = create_coach_explainer(
-        AppSettings(
-            llm_provider="dashscope",
-            dashscope_api_key="dashscope-test-key",
-            openai_api_key=None,
-            dashscope_model="qwen-plus",
-            dashscope_base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
-        )
-    )
+def test_factory_uses_llm_explainer_for_online_provider():
+    explainer = create_training_plan_explainer(CapturingLLMProvider())
 
     assert isinstance(explainer, LLMCoachExplainer)
