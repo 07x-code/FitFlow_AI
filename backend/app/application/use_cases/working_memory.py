@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from app.domain.memory import WorkingMemoryListResponse
+from app.domain.models import WorkingMemoryListResponse
 from app.ports.working_memory import WorkingMemoryStorePort
 
 

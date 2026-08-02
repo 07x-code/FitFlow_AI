@@ -1,6 +1,6 @@
 from typing import Protocol
 
-from app.domain.memory import WorkingMemoryItem
+from app.domain.models import WorkingMemoryItem
 
 
 class WorkingMemoryStorePort(Protocol):

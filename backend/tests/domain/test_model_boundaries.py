@@ -3,7 +3,7 @@ from pathlib import Path
 
 from app.domain import models
 from app.domain.models.coach import CoachChatRequest
-from app.domain.models.memory import UserMemoryCreate
+from app.domain.models.user_memory import UserMemoryCreate
 from app.domain.models.plan import TrainingPlanDraft
 from app.domain.models.profile import FitnessProfileCreate
 from app.domain.models.proposal import TrainingPlanProposalResponse
@@ -23,7 +23,8 @@ def test_legacy_models_module_was_replaced_by_package() -> None:
 def test_model_groups_have_independent_modules() -> None:
     expected_modules = {
         "coach.py",
-        "memory.py",
+        "user_memory.py",
+        "working_memory.py",
         "plan.py",
         "profile.py",
         "proposal.py",
@@ -51,7 +52,8 @@ def test_compatibility_exports_reference_split_model_classes() -> None:
 def test_leaf_model_modules_do_not_depend_on_other_model_groups() -> None:
     leaf_modules = {
         "coach.py",
-        "memory.py",
+        "user_memory.py",
+        "working_memory.py",
         "plan.py",
         "profile.py",
         "workout.py",

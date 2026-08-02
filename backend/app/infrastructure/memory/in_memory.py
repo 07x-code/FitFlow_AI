@@ -3,7 +3,8 @@ from dataclasses import dataclass
 from threading import RLock
 from time import monotonic
 
-from app.domain.memory import WorkingMemoryItem, trim_working_memory
+from app.domain.models import WorkingMemoryItem
+from app.domain.policies import trim_working_memory
 
 
 @dataclass

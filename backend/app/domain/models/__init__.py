@@ -1,7 +1,7 @@
-"""领域模型兼容导出入口。
+"""领域模型统一导出入口。
 
-新代码优先从具体模块导入；现有代码可继续使用
-``from app.domain.models import ModelName``。
+具体模型按数据类型放在当前目录；调用方既可以从具体模块导入，
+也可以使用 ``from app.domain.models import ModelName``。
 """
 
 from app.domain.models.coach import (
@@ -9,12 +9,6 @@ from app.domain.models.coach import (
     CoachChatResponse,
     FitnessKnowledgeItem,
     KnowledgeSource,
-)
-from app.domain.models.memory import (
-    MemoryType,
-    UserMemoryCreate,
-    UserMemoryListResponse,
-    UserMemoryResponse,
 )
 from app.domain.models.plan import (
     ExercisePrescription,
@@ -43,6 +37,18 @@ from app.domain.models.proposal import (
     TrainingPlanProposalResponse,
 )
 from app.domain.models.report import WeeklyReportMetrics, WeeklyReportResponse
+from app.domain.models.user_memory import (
+    MemoryType,
+    UserMemoryCreate,
+    UserMemoryListResponse,
+    UserMemoryResponse,
+)
+from app.domain.models.working_memory import (
+    ConversationRole,
+    WorkingMemoryItem,
+    WorkingMemoryKind,
+    WorkingMemoryListResponse,
+)
 from app.domain.models.workout import (
     WorkoutHistoryResponse,
     WorkoutSafetyAlert,
@@ -54,6 +60,7 @@ from app.domain.models.workout import (
 __all__ = [
     "CoachChatRequest",
     "CoachChatResponse",
+    "ConversationRole",
     "ExercisePrescription",
     "FitnessGoal",
     "FitnessKnowledgeItem",
@@ -81,6 +88,9 @@ __all__ = [
     "UserMemoryResponse",
     "WeeklyReportMetrics",
     "WeeklyReportResponse",
+    "WorkingMemoryItem",
+    "WorkingMemoryKind",
+    "WorkingMemoryListResponse",
     "WorkoutDayDraft",
     "WorkoutHistoryResponse",
     "WorkoutSafetyAlert",

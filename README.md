@@ -14,7 +14,9 @@ FitFlow_AI/
 │   ├── app/
 │   │   ├── api/                         # FastAPI 路由和依赖
 │   │   ├── application/use_cases/       # 应用业务入口
-│   │   ├── domain/                      # 领域模型、安全规则、记忆策略
+│   │   ├── domain/                      # 领域层
+│   │   │   ├── models/                 # 领域数据模型
+│   │   │   └── policies/               # 数据筛选、淘汰与约束策略
 │   │   ├── ai/
 │   │   │   ├── agents/                  # Coach、Planner
 │   │   │   ├── core/                    # Agent 基类和 Message

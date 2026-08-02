@@ -23,9 +23,12 @@
 
 ```text
 backend/app/
-├── domain/memory/
-│   ├── models.py            # 工作记忆条目、类型和响应模型
-│   └── policies.py          # 容量淘汰规则
+├── domain/
+│   ├── models/
+│   │   ├── user_memory.py       # 用户主动保存的长期记忆模型
+│   │   └── working_memory.py    # 会话工作记忆模型
+│   └── policies/
+│       └── working_memory.py    # 容量淘汰规则
 ├── ports/
 │   └── working_memory.py    # WorkingMemoryStorePort
 ├── application/use_cases/
@@ -144,8 +147,8 @@ python -m pip install redis==8.0.1
 
 按以下顺序阅读代码：
 
-1. `domain/memory/models.py`：先看一条工作记忆包含什么。
-2. `domain/memory/policies.py`：理解容量超限时保留和淘汰哪些条目。
+1. `domain/models/working_memory.py`：先看一条工作记忆包含什么。
+2. `domain/policies/working_memory.py`：理解容量超限时保留和淘汰哪些条目。
 3. `ports/working_memory.py`：理解上层只允许使用的三个操作。
 4. `infrastructure/memory/in_memory.py`：用最简单实现理解 TTL、容量和隔离。
 5. `infrastructure/memory/redis_store.py`：再看相同契约如何映射到 Redis。

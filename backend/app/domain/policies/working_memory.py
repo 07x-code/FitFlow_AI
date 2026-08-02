@@ -1,4 +1,4 @@
-from app.domain.memory.models import WorkingMemoryItem
+from app.domain.models.working_memory import WorkingMemoryItem
 
 
 def trim_working_memory(

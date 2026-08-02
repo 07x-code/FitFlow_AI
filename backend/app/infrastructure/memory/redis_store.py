@@ -2,7 +2,7 @@ import json
 from typing import Any, Protocol
 from urllib.parse import quote
 
-from app.domain.memory import WorkingMemoryItem
+from app.domain.models import WorkingMemoryItem
 
 
 APPEND_AND_TRIM_SCRIPT = """

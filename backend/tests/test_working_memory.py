@@ -5,7 +5,7 @@ import pytest
 from pydantic import ValidationError
 
 from app.application.use_cases.working_memory import WorkingMemoryUseCases
-from app.domain.memory import (
+from app.domain.models import (
     ConversationRole,
     WorkingMemoryItem,
     WorkingMemoryKind,

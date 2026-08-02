@@ -7,7 +7,7 @@ from app.api.dependencies import (
     get_working_memory_use_cases,
 )
 from app.application.use_cases import MemoryUseCases, WorkingMemoryUseCases
-from app.domain.memory import WorkingMemoryListResponse
+from app.domain.models import WorkingMemoryListResponse
 from app.domain.models import (
     UserMemoryCreate,
     UserMemoryListResponse,

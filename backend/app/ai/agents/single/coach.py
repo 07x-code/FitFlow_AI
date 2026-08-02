@@ -12,7 +12,7 @@ from app.ai.tools.fitness import (
     create_coach_tool_registry,
 )
 from app.ai.tools.registry import ToolRegistry
-from app.domain.memory import (
+from app.domain.models import (
     ConversationRole,
     WorkingMemoryItem,
     WorkingMemoryKind,
