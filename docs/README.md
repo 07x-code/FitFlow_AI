@@ -2,6 +2,7 @@
 
 ## 当前架构
 
+- [AI Coach 受控工具调用架构](architecture/coach-agent-tool-calling.md)
 - [项目结构收敛说明](architecture/structure-consolidation.md)
 - [ARC-02：领域模型拆分](architecture/arc-02-domain-model-split.md)
 - [MEM-01：工作记忆实现说明](mem-01-working-memory.md)

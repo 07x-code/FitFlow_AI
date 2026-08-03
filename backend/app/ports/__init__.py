@@ -7,7 +7,14 @@ from app.ports.ai import (
     TrainingPlanExplainerPort,
 )
 from app.ports.knowledge import KnowledgeRetrieverPort
-from app.ports.llm import LLMCompletion, LLMProvider
+from app.ports.llm import (
+    LLMCompletion,
+    LLMMessage,
+    LLMProvider,
+    LLMToolCall,
+    LLMToolCompletion,
+    LLMToolDefinition,
+)
 from app.ports.repositories import (
     ProfileRepositoryPort,
     TrainingPlanProposalRepositoryPort,
@@ -21,7 +28,11 @@ __all__ = [
     "CoachAgentPort",
     "KnowledgeRetrieverPort",
     "LLMCompletion",
+    "LLMMessage",
     "LLMProvider",
+    "LLMToolCall",
+    "LLMToolCompletion",
+    "LLMToolDefinition",
     "ProfileRepositoryPort",
     "TrainingPlanAgentPort",
     "TrainingPlanAgentResultPort",

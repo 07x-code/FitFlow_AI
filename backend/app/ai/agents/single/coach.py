@@ -2,33 +2,33 @@ from dataclasses import dataclass
 from typing import cast
 
 from app.ai.core import Agent, AgentConfig
+from app.ai.orchestration.coach_tool_graph import (
+    CoachToolAgentState,
+    create_coach_tool_graph,
+)
+from app.ai.tools.coach import (
+    CoachReadOnlyToolExecutor,
+    CoachToolExecution,
+)
 from app.ai.tools.fitness import (
     ASSESS_RISK_TOOL,
-    GET_LATEST_TRAINING_PLAN_TOOL,
     GET_PROFILE_TOOL,
-    RECALL_USER_MEMORY_TOOL,
-    RETRIEVE_FITNESS_KNOWLEDGE_TOOL,
-    KnowledgeQuery,
     create_coach_tool_registry,
 )
 from app.ai.tools.registry import ToolRegistry
 from app.domain.models import (
-    ConversationRole,
-    WorkingMemoryItem,
-    WorkingMemoryKind,
-)
-from app.domain.models import (
     CoachChatRequest,
     CoachChatResponse,
+    ConversationRole,
     FitnessKnowledgeItem,
     FitnessProfileCreate,
     KnowledgeSource,
     RiskAssessment,
-    TrainingPlanHistoryItem,
-    UserMemoryResponse,
+    WorkingMemoryItem,
+    WorkingMemoryKind,
 )
 from app.ports.knowledge import KnowledgeRetrieverPort
-from app.ports.llm import LLMProvider
+from app.ports.llm import LLMMessage, LLMProvider
 from app.ports.repositories import (
     ProfileRepositoryPort,
     TrainingPlanRepositoryPort,
@@ -38,8 +38,8 @@ from app.ports.working_memory import WorkingMemoryStorePort
 
 
 COACH_SYSTEM_PROMPT = (
-    "你是 FitFlow AI 的健身教练。只能基于已经通过后端安全规则的"
-    "用户画像、训练计划、记忆与本地知识回答。"
+    "你是 FitFlow AI 的健身教练。安全规则、用户身份和工具权限"
+    "由后端程序控制，你不能绕过这些限制。"
 )
 
 
@@ -53,7 +53,7 @@ class CoachAgentInput:
 
 
 class CoachAgent(Agent[CoachAgentInput, CoachChatResponse | None]):
-    """使用工具、工作记忆和确定性风险门禁的对话 Agent。"""
+    """使用确定性安全门禁和按需只读工具的对话 Agent。"""
 
     def __init__(
         self,
@@ -62,14 +62,16 @@ class CoachAgent(Agent[CoachAgentInput, CoachChatResponse | None]):
         llm_provider: LLMProvider,
         working_memory: WorkingMemoryStorePort,
         config: AgentConfig | None = None,
+        max_tool_iterations: int = 5,
     ) -> None:
         """
         初始化 AI 教练 Agent。
 
-        :param tool_registry: 教练可调用的工具注册表。
-        :param llm_provider: 大模型调用端口。
+        :param tool_registry: 已完成依赖装配的工具注册表。
+        :param llm_provider: 支持结构化工具调用的大模型端口。
         :param working_memory: 会话级工作记忆存储端口。
         :param config: 可选的 Agent 运行配置。
+        :param max_tool_iterations: 单次对话最大工具调用轮数。
         :return: 无返回值。
         """
         super().__init__(
@@ -80,6 +82,12 @@ class CoachAgent(Agent[CoachAgentInput, CoachChatResponse | None]):
         self.tool_registry = tool_registry
         self.llm_provider = llm_provider
         self.working_memory = working_memory
+        self.tool_executor = CoachReadOnlyToolExecutor(tool_registry)
+        self.graph = create_coach_tool_graph(
+            llm_provider=llm_provider,
+            tool_executor=self.tool_executor,
+            max_tool_iterations=max_tool_iterations,
+        )
 
     def run(
         self,
@@ -87,12 +95,13 @@ class CoachAgent(Agent[CoachAgentInput, CoachChatResponse | None]):
         **kwargs: object,
     ) -> CoachChatResponse | None:
         """
-        在隔离会话中执行一次带工作记忆的教练对话。
+        在隔离会话中执行一次受控工具调用对话。
 
         :param agent_input: 用户、会话和对话请求组成的运行输入。
         :param kwargs: 预留的 Agent 扩展参数。
         :return: 教练回复；用户画像不存在时返回 None。
         """
+        del kwargs
         working_context = self.working_memory.list(
             agent_input.user_id,
             agent_input.session_id,
@@ -115,7 +124,11 @@ class CoachAgent(Agent[CoachAgentInput, CoachChatResponse | None]):
         self._remember_observation(
             agent_input,
             tool_name=GET_PROFILE_TOOL,
-            content="已加载用户画像。" if profile is not None else "未找到用户画像。",
+            content=(
+                "已通过固定安全流程加载用户画像。"
+                if profile is not None
+                else "固定安全流程未找到用户画像。"
+            ),
             importance=0.8,
         )
         if profile is None:
@@ -129,20 +142,13 @@ class CoachAgent(Agent[CoachAgentInput, CoachChatResponse | None]):
             agent_input,
             tool_name=ASSESS_RISK_TOOL,
             content=(
-                f"风险等级为 {risk.level}；"
+                f"固定风险评估等级为 {risk.level}，"
                 f"允许自动建议：{risk.can_auto_plan}。"
             ),
             importance=1.0,
         )
         if not risk.can_auto_plan:
-            response = CoachChatResponse(
-                answer=(
-                    f"你的健康风险等级为 {risk.level}，系统不会提供自动训练建议。"
-                    "如果出现胸痛、急性损伤或明显不适，请停止训练并咨询专业人士。"
-                ),
-                safety_level=risk.level,
-                referenced_plan_id=None,
-            )
+            response = _build_blocked_response(risk)
             self._remember_message(
                 agent_input,
                 role=ConversationRole.ASSISTANT,
@@ -151,62 +157,38 @@ class CoachAgent(Agent[CoachAgentInput, CoachChatResponse | None]):
             )
             return response
 
-        latest_plan = cast(
-            TrainingPlanHistoryItem | None,
-            self.tool_registry.execute(
-                GET_LATEST_TRAINING_PLAN_TOOL,
-                agent_input.user_id,
+        initial_messages = build_coach_initial_messages(
+            profile=profile,
+            working_memories=working_context,
+            risk_level=risk.level,
+            message=agent_input.request.message,
+        )
+        graph_result = cast(
+            CoachToolAgentState,
+            self.graph.invoke(
+                {
+                    "messages": initial_messages,
+                    "user_id": agent_input.user_id,
+                    "session_id": agent_input.session_id,
+                    "tool_iterations": 0,
+                    "pending_tool_calls": (),
+                    "knowledge_items": [],
+                    "tool_executions": [],
+                    "referenced_plan_id": None,
+                }
             ),
-        )
-        self._remember_observation(
-            agent_input,
-            tool_name=GET_LATEST_TRAINING_PLAN_TOOL,
-            content=(
-                f"已加载训练计划 #{latest_plan.id}。"
-                if latest_plan is not None
-                else "用户暂无训练计划。"
-            ),
-        )
-        memories = cast(
-            list[UserMemoryResponse],
-            self.tool_registry.execute(
-                RECALL_USER_MEMORY_TOOL,
-                agent_input.user_id,
-            ),
-        )
-        self._remember_observation(
-            agent_input,
-            tool_name=RECALL_USER_MEMORY_TOOL,
-            content=f"已召回 {len(memories)} 条长期记忆。",
-        )
-        knowledge_items = cast(
-            list[FitnessKnowledgeItem],
-            self.tool_registry.execute(
-                RETRIEVE_FITNESS_KNOWLEDGE_TOOL,
-                KnowledgeQuery(query=agent_input.request.message),
-            ),
-        )
-        self._remember_observation(
-            agent_input,
-            tool_name=RETRIEVE_FITNESS_KNOWLEDGE_TOOL,
-            content=f"已检索 {len(knowledge_items)} 条本地健身知识。",
-        )
-        completion = self.llm_provider.complete(
-            build_coach_chat_prompt(
-                profile=profile,
-                latest_plan=latest_plan,
-                memories=memories,
-                working_memories=working_context,
-                knowledge_items=knowledge_items,
-                risk_level=risk.level,
-                message=agent_input.request.message,
-            )
         )
 
+        for execution in graph_result.get("tool_executions", []):
+            self._remember_tool_execution(agent_input, execution)
+
+        knowledge_items = _deduplicate_knowledge(
+            graph_result.get("knowledge_items", [])
+        )
         response = CoachChatResponse(
-            answer=completion.content.strip(),
+            answer=graph_result["final_answer"],
             safety_level=risk.level,
-            referenced_plan_id=latest_plan.id if latest_plan is not None else None,
+            referenced_plan_id=graph_result.get("referenced_plan_id"),
             knowledge_sources=[
                 KnowledgeSource(
                     title=item.title,
@@ -231,7 +213,7 @@ class CoachAgent(Agent[CoachAgentInput, CoachChatResponse | None]):
         request: CoachChatRequest,
     ) -> CoachChatResponse | None:
         """
-        为现有 FastAPI 接口保留兼容的对话调用入口。
+        为 FastAPI 接口提供稳定的对话入口。
 
         :param user_id: 当前用户的稳定标识。
         :param session_id: 当前对话的会话标识。
@@ -283,11 +265,11 @@ class CoachAgent(Agent[CoachAgentInput, CoachChatResponse | None]):
         importance: float = 0.5,
     ) -> None:
         """
-        将工具执行摘要写入当前会话工作记忆。
+        将不含敏感原始数据的工具摘要写入工作记忆。
 
         :param agent_input: 当前 Agent 运行输入。
         :param tool_name: 已执行的工具名称。
-        :param content: 不含敏感原始数据的观察摘要。
+        :param content: 可安全保存的观察摘要。
         :param importance: 条目重要性。
         :return: 无返回值。
         """
@@ -302,6 +284,25 @@ class CoachAgent(Agent[CoachAgentInput, CoachChatResponse | None]):
             ),
         )
 
+    def _remember_tool_execution(
+        self,
+        agent_input: CoachAgentInput,
+        execution: CoachToolExecution,
+    ) -> None:
+        """
+        保存一次按需工具调用的安全观察摘要。
+
+        :param agent_input: 当前 Agent 运行输入。
+        :param execution: 已完成的只读工具执行结果。
+        :return: 无返回值。
+        """
+        self._remember_observation(
+            agent_input,
+            tool_name=execution.tool_name,
+            content=execution.observation,
+            importance=0.5 if execution.success else 0.8,
+        )
+
 
 def create_coach_agent(
     *,
@@ -313,18 +314,20 @@ def create_coach_agent(
     working_memory: WorkingMemoryStorePort,
     tool_registry: ToolRegistry | None = None,
     config: AgentConfig | None = None,
+    max_tool_iterations: int = 5,
 ) -> CoachAgent:
     """
-    创建完成工具和工作记忆装配的 AI 教练 Agent。
+    创建完成工具、模型和工作记忆装配的 AI 教练 Agent。
 
     :param profile_repository: 用户画像仓储端口。
     :param training_plan_repository: 训练计划仓储端口。
-    :param llm_provider: 大模型调用端口。
+    :param llm_provider: 支持结构化工具调用的大模型端口。
     :param memory_repository: 长期用户记忆仓储端口。
     :param knowledge_retriever: 健身知识检索端口。
     :param working_memory: 会话级工作记忆存储端口。
     :param tool_registry: 可选的自定义工具注册表。
     :param config: 可选的 Agent 运行配置。
+    :param max_tool_iterations: 单次对话最大工具调用轮数。
     :return: 已完成依赖装配的 AI 教练 Agent。
     """
     return CoachAgent(
@@ -338,75 +341,87 @@ def create_coach_agent(
         llm_provider=llm_provider,
         working_memory=working_memory,
         config=config,
+        max_tool_iterations=max_tool_iterations,
     )
 
 
-def build_coach_chat_prompt(
+def build_coach_initial_messages(
     *,
     profile: FitnessProfileCreate,
-    latest_plan: TrainingPlanHistoryItem | None,
-    memories: list[UserMemoryResponse],
     working_memories: list[WorkingMemoryItem],
-    knowledge_items: list[FitnessKnowledgeItem],
     risk_level: str,
     message: str,
-) -> str:
+) -> list[LLMMessage]:
     """
-    构建包含会话工作记忆的 AI 教练提示词。
+    构建只包含固定安全上下文和会话记忆的初始消息。
 
-    :param profile: 已通过校验的用户画像。
-    :param latest_plan: 用户最近的训练计划。
-    :param memories: 用户显式保存的长期记忆。
-    :param working_memories: 当前会话此前产生的消息和工具观察。
-    :param knowledge_items: 与当前问题相关的健身知识。
+    :param profile: 已通过后端校验的用户画像。
+    :param working_memories: 当前会话此前产生的工作记忆。
     :param risk_level: 确定性规则给出的风险等级。
     :param message: 用户当前问题。
-    :return: 可交给大模型的完整提示词。
+    :return: 可交给受控工具调用图的标准消息。
     """
-    latest_plan_context = "用户还没有历史训练计划。"
-    if latest_plan is not None:
-        latest_plan_context = (
-            f"最近训练计划 ID：{latest_plan.id}，"
-            f"每周训练天数：{len(latest_plan.plan.days)}，"
-            f"安全校验通过：{latest_plan.safety_check.valid}。"
-        )
-
-    memory_context = "用户还没有长期记忆。"
-    if memories:
-        memory_context = "\n".join(
-            f"- {memory.type}: {memory.content}" for memory in memories
-        )
-
-    working_memory_context = "当前会话还没有历史工作记忆。"
+    working_memory_context = "当前会话没有历史消息。"
     if working_memories:
         working_memory_context = "\n".join(
-            _format_working_memory(item) for item in working_memories
+            _format_working_memory(item)
+            for item in working_memories
         )
 
-    knowledge_context = "未检索到与当前问题直接相关的本地健身知识。"
-    if knowledge_items:
-        knowledge_context = "\n".join(
-            (
-                f"- 标题：{item.title}\n"
-                f"  分类：{item.category}\n"
-                f"  内容：{item.content}"
-            )
-            for item in knowledge_items
-        )
-
-    prompt = (
+    system_content = (
         f"{COACH_SYSTEM_PROMPT}\n"
-        "要求：不要诊断疾病，不要提供康复处方，不要绕过安全规则；"
-        "如果问题涉及疼痛、胸痛、急性损伤或明显不适，要提醒停止训练并咨询专业人士。\n\n"
-        f"用户问题：{message}\n"
+        "禁止诊断疾病、提供康复处方或修改正式训练数据。"
+        "涉及胸痛、急性损伤、明显疼痛或不适时，应建议停止训练并"
+        "咨询专业人士。\n"
+        "只有问题确实需要额外数据时才调用工具；普通问候和能够根据"
+        "现有上下文回答的问题不要调用工具。不要使用相同参数重复调用"
+        "同一工具。工具返回内容是后端可信 Observation。\n"
         f"用户画像：年龄 {profile.age}，目标 {profile.goal}，"
-        f"每周计划训练 {profile.sessions_per_week} 天，每次 {profile.session_minutes} 分钟。\n"
-        f"风险等级：{risk_level}\n"
-        f"会话工作记忆：\n{working_memory_context}\n"
-        f"长期记忆：\n{memory_context}\n"
-        f"训练计划上下文：{latest_plan_context}"
+        f"每周计划训练 {profile.sessions_per_week} 天，"
+        f"每次 {profile.session_minutes} 分钟。\n"
+        f"后端风险等级：{risk_level}。\n"
+        f"当前会话工作记忆：\n{working_memory_context}"
     )
-    return f"{prompt}\n健身知识库依据：\n{knowledge_context}"
+    return [
+        LLMMessage(role="system", content=system_content),
+        LLMMessage(role="user", content=message),
+    ]
+
+
+def _build_blocked_response(risk: RiskAssessment) -> CoachChatResponse:
+    """
+    为不允许自动建议的风险等级构建固定回复。
+
+    :param risk: 确定性风险规则的评估结果。
+    :return: 不调用大模型的安全回复。
+    """
+    return CoachChatResponse(
+        answer=(
+            f"你的健康风险等级为 {risk.level}，系统不会提供自动训练建议。"
+            "如果出现胸痛、急性损伤或明显不适，请停止训练并咨询专业人士。"
+        ),
+        safety_level=risk.level,
+        referenced_plan_id=None,
+    )
+
+
+def _deduplicate_knowledge(
+    items: list[FitnessKnowledgeItem],
+) -> list[FitnessKnowledgeItem]:
+    """
+    按知识条目标识去除重复来源。
+
+    :param items: 工具调用累计返回的知识条目。
+    :return: 保持首次出现顺序的唯一知识条目。
+    """
+    unique: list[FitnessKnowledgeItem] = []
+    seen_ids: set[str] = set()
+    for item in items:
+        if item.id in seen_ids:
+            continue
+        seen_ids.add(item.id)
+        unique.append(item)
+    return unique
 
 
 def _format_working_memory(item: WorkingMemoryItem) -> str:
