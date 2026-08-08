@@ -59,6 +59,8 @@ FitFlow AI 要做成一个安全、可追踪、能在并发压力下稳定运行
 
 ### 主要缺口
 
+> PostgreSQL 是正式业务数据库。阶段 0 先完成数据库基础设施重构，后续功能开发、集成测试和性能压测全部基于 PostgreSQL；不长期维护两套 Repository。
+
 | 问题 | 影响 |
 |---|---|
 | 本轮高风险输入主要依赖模型提示词 | “我现在胸痛”仍可能进入普通回答 |
@@ -69,8 +71,30 @@ FitFlow AI 要做成一个安全、可追踪、能在并发压力下稳定运行
 | Agent 可调用的业务工具还不完整 | 无法根据真实训练情况进行分析 |
 | 没有统一 Trace 和 Agent Eval | 出错后难定位，也无法量化效果 |
 | LLM、LangGraph、Redis 和数据库以同步调用为主 | 请求多时容易耗尽线程 |
-| SQLite 写并发能力有限 | 多人同时打卡或审批时容易锁冲突 |
+| PostgreSQL 工程基础尚未完成 | 后续事务、连接池、并发写入和多实例部署没有稳定基础 |
 | 没有限流、背压、幂等和熔断 | 流量或依赖故障可能拖垮服务 |
+| Working Memory 默认仍可使用进程内 `memory` | 多 Worker 或多容器下会话状态不一致 |
+| DashScope 使用同步 `urllib` 且每次单独建连 | 长请求占用线程，无法复用 HTTP 连接池 |
+| 历史列表缺少游标分页 | 数据增长后查询、内存和响应序列化成本持续上升 |
+| Proposal 审批的“保存计划”和“更新状态”尚未形成原子操作 | 并发审批可能生成重复正式计划 |
+
+### 高并发改造原则
+
+参考 C++ PointServer 项目的多进程、事件驱动、有界队列、线程池、连接池和退避设计，但不直接复制它的实现和参数：
+
+| C++ 项目中的机制 | FitFlow AI 的落地方式 |
+|---|---|
+| `epoll` 非阻塞网络 | FastAPI + ASGI + Uvicorn 事件循环 |
+| Master/Worker 多进程 | 多 Uvicorn Worker 或无状态 API 容器副本 |
+| 无锁共享内存队列 | Redis 支撑的有界任务队列，仅用于离线长任务 |
+| CPU 线程池 | CPU 密集任务使用独立进程或独立 Worker |
+| MySQL 连接池 | PostgreSQL 异步连接池及总连接预算 |
+| 队列高水位、重试和退避 | Semaphore、限流、队列上限、`429/503` 和随机退避 |
+| 最大网络连接数 | API Gateway 和 Uvicorn 的并发、积压连接限制 |
+
+FitFlow AI 当前主要是数据库和 LLM 网络 I/O，不需要自行实现 Socket、epoll 或无锁队列。Python GIL 只会显著影响 CPU 密集型任务；等待 LLM、Redis 和数据库时，首选端到端异步 I/O。
+
+不能用 Worker 数、线程数或连接池大小证明高并发。最终结论必须来自固定硬件、固定数据、固定 Provider 配额下的压测结果。
 
 ## 4. 最终业务流程
 
@@ -103,34 +127,87 @@ Agent 判断是否调用工具
 
 | 阶段 | 目标 | 优先级 | 建议时间 |
 |---|---|---:|---:|
-| 0 | 固定功能和性能基线 | P0 | 1 天 |
+| 0 | 建立 PostgreSQL 工程基础并固定基线 | P0 | 4～6 天 |
 | 1 | 补齐安全规则和写入边界 | P0 | 3～4 天 |
 | 2 | 打通真实产品闭环和认证 | P0 | 5～7 天 |
 | 3 | 完善 Agent 上下文、记忆和工具 | P0 | 5～7 天 |
 | 4 | 建立 Trace 和 Agent Eval | P0 | 4～6 天 |
-| 5 | 完成高并发和稳定性改造 | P0 | 8～10 天 |
+| 5 | 完成高并发和稳定性改造 | P0 | 6～8 天 |
 | 6 | 完成部署和秋招交付 | P0 | 4～5 天 |
 | 7 | 增强体验 | P1 | 有时间再做 |
 
 每个阶段完成前必须满足：功能能运行、自动化测试通过、可以现场演示。
 
-## 6. 阶段 0：固定基线
+全局不变量：阶段 0 验收通过后，阶段 1～7 的本地开发、测试、CI、Demo、压测和生产环境全部基于 PostgreSQL；后续阶段不得再出现数据库选型、迁移任务或旧数据库运行路径。
 
-### 任务
+## 6. 阶段 0：PostgreSQL 工程基础与性能基线
+
+阶段 0 是后续开发的硬门槛。数据库基础未通过验收前，不继续增加业务功能或并发 Worker。
+
+### 0.1 PostgreSQL 开发环境
+
+- [ ] 使用 Docker Compose 提供固定版本的 PostgreSQL。
+- [ ] 配置独立的开发库、测试库和演示库。
+- [ ] 使用统一的 `FITFLOW_DATABASE_URL`，禁止在业务代码中拼接连接参数。
+- [ ] 引入 SQLAlchemy 2.x Async、`asyncpg` 和 Alembic。
+- [ ] 在 FastAPI lifespan 中创建和关闭异步 Engine、Session Factory 与连接池。
+- [ ] 提供 `db upgrade`、`db downgrade`、`db reset` 和 Demo Seed 命令。
+- [ ] 如需保留现有数据，只提供一次性导入脚本；业务运行时不保留双数据库适配。
+
+### 0.2 Schema、Repository 和事务
+
+- [ ] 使用 Alembic 创建用户画像、训练计划、Proposal、训练记录和用户记忆表。
+- [ ] 明确定义主键、外键、非空约束、唯一约束和删除策略。
+- [ ] 为 `(user_id, id)`、状态、创建时间和常用筛选条件建立索引。
+- [ ] 将所有 Repository 改为 PostgreSQL 异步实现。
+- [ ] 将 Repository Port、Application Use Case 和依赖注入链路改为异步接口。
+- [ ] 为跨 Repository 写入提供显式 Unit of Work 或共享事务 Session。
+- [ ] 建立事务、条件更新和幂等记录的通用数据库能力，具体业务流程在阶段 1 接入。
+- [ ] 删除旧数据库 Adapter、配置、依赖和测试夹具，项目只保留 PostgreSQL 运行实现。
+
+### 0.3 PostgreSQL 测试体系
+
+- [ ] 单元测试继续隔离纯领域逻辑。
+- [ ] Repository 和 API 集成测试连接独立 PostgreSQL 测试库。
+- [ ] 每个测试用例使用事务回滚或独立 Schema，禁止测试数据互相污染。
+- [ ] CI 启动 PostgreSQL Service，执行 Alembic 后再运行测试。
+- [ ] 覆盖唯一约束、外键、事务回滚、并发更新和连接池耗尽场景。
+
+### 0.4 功能和性能基线
 
 - [ ] 跑完后端测试，记录通过数量和耗时。
 - [ ] 安装前端依赖，运行 lint、测试和生产构建。
 - [ ] 用固定 Demo 数据走通当前真实接口。
 - [ ] 标出真实 API 页面和 Mock 页面。
 - [ ] 记录一次 Coach 请求的模型调用次数、Token 和耗时。
-- [ ] 使用 Locust 或 k6 保存改造前压测结果。
-- [ ] 分开测试普通 API、Fake Coach 和真实 Coach。
+- [ ] 使用 Locust 或 k6 保存 PostgreSQL 初始基线。
+- [ ] 分开测试普通 API、并发写入、Fake Coach 和真实 Coach。
+- [ ] 记录压测机器 CPU、内存、操作系统、Python 版本和网络环境。
+- [ ] 记录 DashScope 的 QPS、并发、Token 和费用配额。
+- [ ] 统计 PostgreSQL 活动连接、连接池等待、慢查询、锁等待和事务回滚。
+
+### 0.5 容量边界
+
+先定义以下目标，再决定 Worker、连接池和限流参数：
+
+- 普通查询和写入接口的峰值 RPS。
+- 同时在线的 Coach 会话数和真实 LLM 并发数。
+- 普通 API 与 Coach 的 p95、p99 延迟目标。
+- 数据库读写比例、最大连接数和预留连接数。
+- 单请求最大模型轮数、Token、总时间和费用。
+
+使用 `并发请求数 ≈ RPS × 平均响应时间` 估算在途请求。例如模型平均耗时 8 秒、到达速率 20 RPS 时，约有 160 个请求同时等待；这类等待不应各自长期占据同步线程。
 
 ### 验收
 
-- 有一份可重复执行的测试命令清单。
-- 有改造前的 RPS、p50、p95、p99 和错误率。
-- 后续所有优化都能与这份基线比较。
+- 应用运行代码、配置和集成测试中只存在 PostgreSQL 数据访问实现。
+- 新环境可通过 Docker Compose、Alembic 和 Seed 命令从零启动。
+- 所有 Repository 与 API 集成测试在 PostgreSQL 测试库通过。
+- 事务、条件更新、约束和回滚等数据库基础能力测试通过。
+- 有普通查询、并发写入、Fake Coach 和真实 Coach 四类独立基线。
+- 有 RPS、p50、p95、p99、错误率、连接池等待和慢查询数据。
+- 有明确的 Provider 配额和单请求最坏时间预算。
+- 后续所有优化都能与这份 PostgreSQL 基线比较。
 
 ## 7. 阶段 1：安全规则和写入边界
 
@@ -151,6 +228,8 @@ Agent 判断是否调用工具
 - 正式计划只能由状态为 `approved` 的 Proposal 生成。
 - 审批和正式计划写入放进数据库事务。
 - 使用条件更新保证一个 Proposal 只能批准一次。
+- 条件更新必须包含 `WHERE id = :id AND user_id = :user_id AND status = 'pending' RETURNING id`，并检查返回行。
+- 为审批请求增加 `Idempotency-Key`，相同键必须返回同一个业务结果。
 - 模型可创建调整 Proposal，但不能直接修改正式计划。
 
 ### 1.3 安全测试
@@ -319,6 +398,26 @@ Agent 判断是否调用工具
 
 高并发不是多开几个 Worker。正确顺序是：减少阻塞、限制资源、保证写入正确，最后再扩容。
 
+目标架构：
+
+```mermaid
+flowchart LR
+    Client["React PWA"] --> Gateway["Nginx / API Gateway<br/>TLS、认证、限流"]
+    Gateway --> API["FastAPI 无状态副本<br/>Async I/O"]
+    API --> PG["PostgreSQL<br/>事务、索引、连接池"]
+    API --> Redis["Redis<br/>会话、限流、短期幂等"]
+    API --> LLM["DashScope<br/>连接池、并发闸门"]
+    API --> Queue["有界任务队列"]
+    Queue --> Worker["后台 Worker<br/>周报和离线长任务"]
+    Worker --> PG
+    Worker --> LLM
+```
+
+请求分为两类：
+
+- 普通 CRUD 和交互式 Coach：由 API 异步处理；Coach 后续可以通过 SSE 流式返回，不能把整段交互放入离线队列。
+- 周报、批量计算和其他允许延迟完成的任务：返回 `202 + job_id`，由有界队列处理，前端轮询或订阅结果。
+
 ### 5.1 完整异步调用链
 
 先改 Coach 这一条完整链路，再改其他接口：
@@ -338,17 +437,36 @@ async FastAPI 路由
 - Redis 使用 `redis.asyncio.Redis`。
 - 应用启动时创建客户端和连接池，关闭时统一释放。
 - CPU 密集任务放入独立进程或后台 Worker。
+- Repository 链路已在阶段 0 异步化；本阶段完成 LLM、Redis、LangGraph、Tool 和 Coach 的端到端异步化。
+- 为 HTTP Client 分开配置连接、读取、写入和连接池等待超时。
+- 设置整次 Coach 请求的总 deadline，不能把每轮 30 秒超时简单累加。
+- 根据 Eval 结果把默认工具调用轮数从 5 收敛到完成任务所需的最小值，优先评估 2～3 轮。
 
 只修改成 `async def` 不够，内部网络和数据库调用也必须是异步的。
 
-### 5.2 PostgreSQL 和连接池
+现有同步 `def` 路由会由 FastAPI 放入线程池，因此不会直接阻塞事件循环，但每个慢 LLM 请求仍会长期占用一个线程。异步化的目标是释放等待线程，并通过连接池和并发闸门控制真实下游压力。
 
-- 生产环境使用 PostgreSQL，SQLite 只用于本地简单运行或测试。
-- 使用 SQLAlchemy Async 或 asyncpg。
-- 使用 Alembic 管理数据库迁移。
-- 配置连接池大小、等待超时和连接回收。
-- 为用户、计划、状态和时间查询建立合适索引。
-- Proposal 审批、计划切换和训练打卡使用事务。
+### 5.2 PostgreSQL 连接池和查询调优
+
+阶段 0 已完成 PostgreSQL 工程基础，本阶段只根据真实指标调优，不再更换数据库实现：
+
+- 根据阶段 0 基线调整 `pool_size`、`max_overflow`、`pool_timeout` 和连接回收参数。
+- 配置 `statement_timeout`、`lock_timeout` 和空闲事务超时。
+- 事务只包围必要的数据库操作，禁止在事务中等待 LLM 或其他远程服务。
+- 使用 `pg_stat_statements` 和慢查询日志定位热点 SQL。
+- 使用 `EXPLAIN (ANALYZE, BUFFERS)` 验证索引，不能仅凭字段猜测。
+- 所有历史列表使用游标分页，优先使用 `(user_id, id)` 或 `(user_id, created_at, id)` 索引。
+- 监控活动连接、池等待时间、事务时长、锁等待、死锁和回滚次数。
+
+数据库连接池遵守总预算：
+
+```text
+API 容器数 × 每容器 Worker 数 × 每 Worker 连接池上限
+  + 后台 Worker 连接数
+  <= PostgreSQL 可用业务连接数的约 70%
+```
+
+例如数据库允许 100 个业务连接时，可以从 `2 个容器 × 2 个 Worker × 每 Worker 10～15 个连接` 起步，将剩余连接留给后台任务、迁移和运维。不能照搬参考项目的 1024 个连接上限。
 
 ### 5.3 限流和背压
 
@@ -358,6 +476,9 @@ async FastAPI 路由
 - 限制请求体和上下文大小。
 - 系统满载时快速返回 `429` 或 `503`。
 - 返回 `Retry-After`，告诉客户端何时重试。
+
+- 普通 API、LLM 请求和后台任务使用独立并发预算，避免慢模型请求饿死画像、打卡和健康检查接口。
+- API Gateway、应用层和 Provider 调用层分别设限，任何一层都不能无限排队。
 
 限流不是为了少服务用户，而是避免一批慢请求拖死所有请求。
 
@@ -381,6 +502,9 @@ async FastAPI 路由
 - 模型不可用时，普通训练数据仍能查询和保存。
 - 客户端断开后取消下游请求。
 
+- 熔断、并发限制和超时参数必须可配置，并记录触发次数。
+- LLM 重试可能产生重复费用，每次请求最多进行少量重试，并计入总 deadline 和 Token/费用预算。
+
 不能无条件重试写操作，否则可能生成重复数据。
 
 ### 5.6 Redis 和多实例
@@ -395,7 +519,7 @@ Redis 用于：
 
 正式业务数据仍以 PostgreSQL 为准。缓存键必须包含用户范围。
 
-部署多个 Worker 或容器实例后，共享状态必须放入 PostgreSQL 或 Redis。`InMemoryWorkingMemoryStore` 只用于测试和本地开发。
+部署多个 Worker 或容器实例后，共享状态必须放入 PostgreSQL 或 Redis。`InMemoryWorkingMemoryStore` 只作为纯单元测试替身，不承载业务持久化、集成测试或本地联调数据。
 
 ### 5.7 健康检查和优雅关闭
 
@@ -410,7 +534,8 @@ Fake Provider 和真实模型必须分开压测：
 
 | 场景 | 验收方式 |
 |---|---|
-| 普通查询接口 | 记录 100 并发下的 RPS、p95、p99 和错误率 |
+| 普通查询接口 | 按 50、100、200 并发逐级加压，记录 RPS、p95、p99 和错误率 |
+| 并发写入接口 | 按 10、25、50 并发逐级加压，不出现锁错误和重复业务数据 |
 | Fake Coach | 100 个并发会话，无线程池耗尽和跨用户记忆污染 |
 | 真实 Coach | 不超过配置并发值；满载时快速返回 429/503，而不是大量 500 |
 | 重复审批 | 20 个请求同时批准一个 Proposal，只生成一个正式计划 |
@@ -419,7 +544,7 @@ Fake Provider 和真实模型必须分开压测：
 
 压测报告展示：
 
-- 改造前后 RPS。
+- 阶段 0 PostgreSQL 初始基线与阶段 5 PostgreSQL 优化后 RPS。
 - p50、p95 和 p99。
 - 错误率。
 - 排队时间和活动 LLM 请求数。
@@ -430,15 +555,44 @@ Fake Provider 和真实模型必须分开压测：
 
 最终目标值在阶段 0 得到基线后确定，不能编造数据写进简历。
 
+阶段 0 和阶段 5 的对比压测必须使用相同 PostgreSQL Schema、Seed 数据、硬件规格和 Provider 配置。
+
+### 5.9 推荐落地顺序
+
+1. 确认阶段 0 PostgreSQL 基线、容量预算和数据库监控可用。
+2. 将 DashScope、LangGraph、Redis 和 Coach 链路改成端到端异步。
+3. 为普通 API、LLM 和后台任务设置独立并发预算与有界等待队列。
+4. 增加总 deadline、有限重试、熔断、降级和客户端取消传播。
+5. 根据 PostgreSQL 指标调优连接池、慢查询和索引，并压测事务与幂等。
+6. 在单实例压测稳定后增加 Uvicorn Worker 和容器副本。
+7. 只有离线长任务确有排队需求时才引入任务队列。
+
+每完成一步都重新运行功能测试、Agent Eval 和同一组压测，不能把所有基础设施一次性替换后再定位问题。
+
 ## 12. 阶段 6：部署和秋招交付
 
 ### 工程交付
 
 - [ ] Docker Compose 一次启动 Web、API、PostgreSQL 和 Redis。
+- [ ] 使用 Linux 容器部署，入口增加 Nginx 或同等 API Gateway。
 - [ ] `.env.example` 列全配置，但不包含真实密钥。
 - [ ] CI 运行单元测试、集成测试、核心 Agent Eval 和短压测。
 - [ ] 提供数据库迁移和 Demo Seed 命令。
 - [ ] 提供结构化日志、健康检查和故障排查说明。
+
+生产部署从每容器 1～2 个 Uvicorn Worker 起步，通过增加容器副本扩容。可使用以下参数作为压测起点，而不是未经测试的最终配置：
+
+```bash
+uvicorn app.main:app \
+  --host 0.0.0.0 \
+  --port 8000 \
+  --workers 2 \
+  --limit-concurrency 300 \
+  --backlog 1024 \
+  --timeout-keep-alive 5
+```
+
+Worker、连接池和并发上限必须共同计算，确保扩容 API 时不会把 PostgreSQL、Redis 或 DashScope 压垮。
 
 ### 展示材料
 
@@ -505,11 +659,13 @@ Fake Provider 和真实模型必须分开压测：
 ## 15. 推荐执行顺序
 
 ```text
-先做安全和真实业务闭环
-  → 再完善 Agent 工具、上下文和记忆
-  → 再用 Trace 和 Eval 证明 Agent 确实有效
-  → 再完成异步化、高并发和稳定性
-  → 最后整理部署、压测和面试材料
+阶段 0：PostgreSQL 工程基础和性能基线
+  → 阶段 1：安全规则和写入边界
+  → 阶段 2：真实产品闭环和认证
+  → 阶段 3：Agent 工具、上下文和记忆
+  → 阶段 4：Trace 和 Agent Eval
+  → 阶段 5：异步化、高并发和稳定性
+  → 阶段 6：部署、压测和秋招交付
 ```
 
 不要同时开启多个大模块。当前阶段完成并通过验收后，再进入下一阶段。
