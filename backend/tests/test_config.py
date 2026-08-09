@@ -1,3 +1,4 @@
+import pytest
 from app.core.config import AppSettings
 
 
@@ -36,3 +37,65 @@ def test_settings_uses_dashscope_defaults(monkeypatch):
 
     assert settings.dashscope_model == "qwen-plus"
     assert settings.dashscope_base_url == "https://dashscope.aliyuncs.com/compatible-mode/v1"
+
+
+def test_settings_reads_database_url(monkeypatch):
+    """
+    验证应用配置能够读取 PostgreSQL 连接地址。
+
+    :param monkeypatch: Pytest 提供的环境变量替换工具。
+    :return: 无返回值。
+    """
+    database_url = (
+        "postgresql+asyncpg://fitflow:fitflow@127.0.0.1:5432/fitflow_test"
+    )
+    monkeypatch.setenv("FITFLOW_DATABASE_URL", database_url)
+
+    settings = AppSettings.from_env()
+
+    assert settings.database_url == database_url
+
+
+def test_settings_rejects_empty_database_url(monkeypatch):
+    """
+    验证应用拒绝空白的 PostgreSQL 连接地址。
+
+    :param monkeypatch: Pytest 提供的环境变量替换工具。
+    :return: 无返回值。
+    """
+    monkeypatch.setenv("FITFLOW_DATABASE_URL", "   ")
+
+    with pytest.raises(ValueError, match="FITFLOW_DATABASE_URL"):
+        AppSettings.from_env()
+
+def test_settings_reads_test_database_url(monkeypatch):
+    """
+    验证应用配置能够读取独立的测试数据库地址。
+
+    :param monkeypatch: Pytest 提供的环境变量替换工具。
+    :return: 无返回值。
+    """
+    test_database_url = (
+        "postgresql+asyncpg://fitflow:fitflow@127.0.0.1:5432/fitflow_test"
+    )
+    monkeypatch.setenv(
+        "FITFLOW_TEST_DATABASE_URL",
+        test_database_url,
+    )
+
+    settings = AppSettings.from_env()
+
+    assert settings.test_database_url == test_database_url
+
+
+def test_settings_rejects_empty_test_database_url(monkeypatch):
+    """
+    验证应用拒绝空白的测试数据库地址。
+
+    :param monkeypatch: Pytest 提供的环境变量替换工具。
+    :return: 无返回值。
+    """
+    monkeypatch.setenv("FITFLOW_TEST_DATABASE_URL", "   ")
+
+    with pytest.raises(ValueError, match="FITFLOW_TEST_DATABASE_URL"):
+        AppSettings.from_env()

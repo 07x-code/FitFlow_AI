@@ -4,6 +4,13 @@ from pathlib import Path
 
 
 DEFAULT_ENV_PATH = Path(__file__).resolve().parents[2] / ".env"
+DEFAULT_DATABASE_URL = (
+    "postgresql+asyncpg://fitflow:fitflow@127.0.0.1:5432/fitflow_dev"
+)
+
+DEFAULT_TEST_DATABASE_URL = (
+    "postgresql+asyncpg://fitflow:fitflow@127.0.0.1:5432/fitflow_test"
+)
 
 
 def _load_env_file(path: str | Path = DEFAULT_ENV_PATH) -> None:
@@ -51,6 +58,8 @@ class AppSettings:
     openai_api_key: str | None
     dashscope_model: str
     dashscope_base_url: str
+    database_url: str = DEFAULT_DATABASE_URL
+    test_database_url: str = DEFAULT_TEST_DATABASE_URL
     working_memory_backend: str = "memory"
     redis_url: str = "redis://127.0.0.1:6379/0"
     working_memory_ttl_seconds: int = 7200
@@ -63,7 +72,23 @@ class AppSettings:
 
         :return: 已解析的应用配置。
         """
+        database_url = _read_env(
+            "FITFLOW_DATABASE_URL",
+            default=DEFAULT_DATABASE_URL,
+        )
+        if database_url is None:
+            raise ValueError("FITFLOW_DATABASE_URL must not be empty")
+
+
+        test_database_url = _read_env(
+            "FITFLOW_TEST_DATABASE_URL",
+            default=DEFAULT_TEST_DATABASE_URL,
+        )
+        if test_database_url is None:
+            raise ValueError("FITFLOW_TEST_DATABASE_URL must not be empty")
+        
         return cls(
+            
             llm_provider=_read_env("FITFLOW_LLM_PROVIDER", default="fake").lower(),
             dashscope_api_key=_read_env("DASHSCOPE_API_KEY"),
             openai_api_key=_read_env("OPENAI_API_KEY"),
@@ -72,6 +97,8 @@ class AppSettings:
                 "DASHSCOPE_BASE_URL",
                 default="https://dashscope.aliyuncs.com/compatible-mode/v1",
             ),
+            database_url=database_url,
+            test_database_url=test_database_url,
             working_memory_backend=_read_env(
                 "FITFLOW_WORKING_MEMORY_BACKEND",
                 default="memory",
