@@ -1,6 +1,6 @@
 # 对话式训练计划功能：10 步教学实施计划
 
-> 更新日期：2026-08-08  
+> 更新日期：2026-08-10  
 > 实施方式：用户亲自编写代码，Codex 逐个检查点讲解、审查和验证  
 > 设计依据：[对话式训练计划升级方案](./conversational-training-plan-upgrade-design.md)  
 > 总体规划：[FitFlow AI 秋招分步开发计划](./fitflow-ai-autumn-development-plan.md)
@@ -50,12 +50,12 @@
 
 ### 小检查点
 
-- [ ] 2.1 安装并固定 `SQLAlchemy`、`asyncpg` 和 `alembic` 依赖。
-- [ ] 2.2 在 `AppSettings` 中增加 `database_url`，并校验配置不能为空。
-- [ ] 2.3 创建异步 Engine 和 `async_sessionmaker`。
-- [ ] 2.4 使用 FastAPI lifespan 在启动时创建数据库资源，在关闭时释放 Engine。
-- [ ] 2.5 编写最小连接检查，执行 `SELECT 1`。
-- [ ] 2.6 为测试环境读取独立的 `FITFLOW_TEST_DATABASE_URL`。
+- [x] 2.1 安装并固定 `SQLAlchemy`、`asyncpg` 和 `alembic` 依赖。
+- [x] 2.2 在 `AppSettings` 中增加 `database_url`，并校验配置不能为空。
+- [x] 2.3 创建异步 Engine 和 `async_sessionmaker`。
+- [x] 2.4 使用 FastAPI lifespan 在启动时创建数据库资源，在关闭时释放 Engine。
+- [x] 2.5 编写最小连接检查，执行 `SELECT 1`。
+- [x] 2.6 为测试环境读取独立的 `FITFLOW_TEST_DATABASE_URL`。
 
 ### 验收
 
