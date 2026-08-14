@@ -33,16 +33,10 @@ target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:
-    """Run migrations in 'offline' mode.
+    """
+    在离线模式下生成数据库迁移 SQL。
 
-    This configures the context with just a URL
-    and not an Engine, though an Engine is acceptable
-    here as well.  By skipping the Engine creation
-    we don't even need a DBAPI to be available.
-
-    Calls to context.execute() here emit the given string to the
-    script output.
-
+    :return: 无返回值。
     """
     url = settings.database_url
     context.configure(
@@ -57,6 +51,12 @@ def run_migrations_offline() -> None:
 
 
 def do_run_migrations(connection: Connection) -> None:
+    """
+    使用指定数据库连接执行迁移。
+
+    :param connection: Alembic 执行迁移使用的同步数据库连接。
+    :return: 无返回值。
+    """
     context.configure(connection=connection, target_metadata=target_metadata)
 
     with context.begin_transaction():
@@ -64,9 +64,10 @@ def do_run_migrations(connection: Connection) -> None:
 
 
 async def run_async_migrations() -> None:
-    """In this scenario we need to create an Engine
-    and associate a connection with the context.
+    """
+    创建异步数据库连接并执行在线迁移。
 
+    :return: 无返回值。
     """
 
     connectable = create_async_engine(
@@ -81,7 +82,11 @@ async def run_async_migrations() -> None:
 
 
 def run_migrations_online() -> None:
-    """Run migrations in 'online' mode."""
+    """
+    在在线模式下运行异步数据库迁移。
+
+    :return: 无返回值。
+    """
 
     asyncio.run(run_async_migrations())
 

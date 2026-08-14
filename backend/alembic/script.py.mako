@@ -19,10 +19,18 @@ depends_on: Union[str, Sequence[str], None] = ${repr(depends_on)}
 
 
 def upgrade() -> None:
-    """Upgrade schema."""
+    """
+    应用本次数据库结构变更。
+
+    :return: 无返回值。
+    """
     ${upgrades if upgrades else "pass"}
 
 
 def downgrade() -> None:
-    """Downgrade schema."""
+    """
+    撤销本次数据库结构变更。
+
+    :return: 无返回值。
+    """
     ${downgrades if downgrades else "pass"}
