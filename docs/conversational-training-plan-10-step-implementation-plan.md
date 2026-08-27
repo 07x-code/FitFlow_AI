@@ -1,6 +1,6 @@
 # 对话式训练计划功能：10 步教学实施计划
 
-> 更新日期：2026-08-10  
+> 更新日期：2026-08-19  
 > 实施方式：用户亲自编写代码，Codex 逐个检查点讲解、审查和验证  
 > 设计依据：[对话式训练计划升级方案](./conversational-training-plan-upgrade-design.md)  
 > 总体规划：[FitFlow AI 秋招分步开发计划](./fitflow-ai-autumn-development-plan.md)
@@ -93,10 +93,12 @@
 
 逐个替换 SQLite Repository，并把相关 Port、Use Case 和 API 调整为异步调用。
 
+> 执行顺序调整（2026-08-19）：4.1 和 4.2 已完成。由于 `training_plans` 要求目标周、版本、状态和必填的 `source_proposal_id`，而当前领域模型尚未提供这些数据，4.3 至 4.8 暂停。先完成第 6 步的训练计划与 Proposal 领域模型升级，再从 4.3 恢复 Repository 迁移。
+
 ### 小检查点
 
-- [ ] 4.1 先迁移 `ProfileRepository`，完成保存、查询和用户隔离测试。
-- [ ] 4.2 迁移 `UserMemoryRepository`。
+- [x] 4.1 先迁移 `ProfileRepository`，完成保存、查询和用户隔离测试。
+- [x] 4.2 迁移 `UserMemoryRepository`。
 - [ ] 4.3 迁移 `TrainingPlanRepository`。
 - [ ] 4.4 迁移 `TrainingPlanProposalRepository`。
 - [ ] 4.5 迁移 `WorkoutSessionRepository` 和周报查询。
@@ -139,6 +141,8 @@
 ### 目标
 
 让计划能表示具体自然周、日期和版本，让 Proposal 能保留修订历史。
+
+> 当前执行入口：本步骤提前到 4.2 之后实施。6.1 至 6.7 完成后，返回 4.3 继续迁移 `TrainingPlanRepository`。
 
 ### 小检查点
 

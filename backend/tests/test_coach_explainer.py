@@ -1,3 +1,4 @@
+from datetime import date
 from app.ai.services.training_plan_explainer import (
     LLMCoachExplainer,
     RuleBasedCoachExplainer,
@@ -8,6 +9,7 @@ from app.domain.models import (
     SafetyCheckResult,
     TrainingPlanDraft,
     TrainingPlanHistoryItem,
+    TrainingPlanStatus,
     WorkoutDayDraft,
 )
 from app.infrastructure.llm.provider import FakeLLMProvider
@@ -62,10 +64,20 @@ def plan_history_item() -> TrainingPlanHistoryItem:
     """
     return TrainingPlanHistoryItem(
         id=1,
+        version=2,
+        status=TrainingPlanStatus.ACTIVE,
+        source_proposal_id=42,
         plan=TrainingPlanDraft(
+            week_start=date(2026, 8, 24),
+            week_end=date(2026, 8, 30),
+            timezone="Asia/Shanghai",
+            goal_summary="每周一次的新手全身训练计划。",
             days=[
                 WorkoutDayDraft(
+                    scheduled_date=date(2026, 8, 24),
                     name="Day 1 - Full Body A",
+                    focus="全身基础力量",
+                    estimated_minutes=60,
                     exercises=[
                         exercise("Goblet Squat"),
                         exercise("Chest Press"),
@@ -78,6 +90,19 @@ def plan_history_item() -> TrainingPlanHistoryItem:
         safety_check=SafetyCheckResult(valid=True, violations=[]),
         created_at="2026-06-18 16:00:00",
     )
+
+
+def test_training_plan_history_keeps_formal_plan_metadata() -> None:
+    """
+    验证正式训练计划保留版本、状态和来源 Proposal。
+
+    :return: 无返回值。
+    """
+    item = plan_history_item()
+
+    assert item.version == 2
+    assert item.status == TrainingPlanStatus.ACTIVE
+    assert item.source_proposal_id == 42
 
 
 def test_rule_based_coach_explainer_returns_plan_explanation():

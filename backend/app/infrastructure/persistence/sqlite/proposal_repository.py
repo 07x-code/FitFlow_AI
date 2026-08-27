@@ -3,6 +3,7 @@ from pathlib import Path
 
 from app.domain.models import (
     ProposalStatus,
+    ProposalOperation,
     ProposalType,
     SafetyCheckResult,
     TrainingPlanDraft,
@@ -222,12 +223,26 @@ class TrainingPlanProposalRepository:
         self,
         row: tuple[int, str, str, str, str, int | None, str | None, str, str | None],
     ) -> TrainingPlanProposalResponse:
+        """
+        将旧 SQLite Proposal 记录转换为升级后的领域响应。
+
+        :param row: SQLite 查询返回的 Proposal 数据行。
+        :return: 包含目标周和修订信息的 Proposal 响应。
+        """
+        plan = TrainingPlanDraft.model_validate_json(row[3])
+
         return TrainingPlanProposalResponse(
             id=row[0],
             type=ProposalType(row[1]),
+            operation=ProposalOperation.CREATE,
+            target_week_start=plan.week_start,
+            base_plan_id=None,
+            parent_proposal_id=None,
+            revision=1,
             status=ProposalStatus(row[2]),
-            plan=TrainingPlanDraft.model_validate_json(row[3]),
+            plan=plan,
             safety_check=SafetyCheckResult.model_validate_json(row[4]),
+            generation_summary=plan.goal_summary,
             approved_plan_id=row[5],
             decision_note=row[6],
             created_at=row[7],

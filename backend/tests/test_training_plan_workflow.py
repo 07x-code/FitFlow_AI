@@ -1,6 +1,6 @@
 from app.domain.models import FitnessProfileCreate
 from app.infrastructure.persistence.sqlite.profile_repository import ProfileRepository
-from app.infrastructure.persistence.sqlite.training_plan_repository import TrainingPlanRepository
+
 from app.ai.agents.single.planner import create_training_plan_agent
 
 
@@ -25,13 +25,11 @@ def save_profile(
     )
 
 
-def test_training_plan_workflow_saves_safe_plan_to_history(tmp_path):
+def test_training_plan_workflow_returns_validated_safe_draft(tmp_path):
     db_path = tmp_path / "fitflow.db"
     profile_repository = ProfileRepository(db_path)
-    training_plan_repository = TrainingPlanRepository(db_path)
     workflow = create_training_plan_agent(
         profile_repository=profile_repository,
-        training_plan_repository=training_plan_repository,
     )
     user_id = "safe-workflow-user"
     save_profile(profile_repository, user_id)
@@ -42,16 +40,13 @@ def test_training_plan_workflow_saves_safe_plan_to_history(tmp_path):
     assert result.response is not None
     assert len(result.response.plan.days) == 3
     assert result.response.safety_check.valid is True
-    assert len(training_plan_repository.list_by_user(user_id)) == 1
 
 
 def test_training_plan_workflow_blocks_risky_profile_without_saving_history(tmp_path):
     db_path = tmp_path / "fitflow.db"
     profile_repository = ProfileRepository(db_path)
-    training_plan_repository = TrainingPlanRepository(db_path)
     workflow = create_training_plan_agent(
         profile_repository=profile_repository,
-        training_plan_repository=training_plan_repository,
     )
     user_id = "risky-workflow-user"
     save_profile(profile_repository, user_id, health_flags=["chest_pain"])
@@ -67,4 +62,3 @@ def test_training_plan_workflow_blocks_risky_profile_without_saving_history(tmp_
             "can_auto_plan": False,
         },
     }
-    assert training_plan_repository.list_by_user(user_id) == []

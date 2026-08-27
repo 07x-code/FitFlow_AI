@@ -70,7 +70,6 @@ def create_container(
 
     training_plan_agent = create_training_plan_agent(
         profile_repository=profile_repository,
-        training_plan_repository=training_plan_repository,
     )
     coach_agent = create_coach_agent(
         profile_repository=profile_repository,

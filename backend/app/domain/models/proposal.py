@@ -1,3 +1,4 @@
+from datetime import date
 from enum import StrEnum
 
 from pydantic import BaseModel, Field
@@ -11,12 +12,45 @@ class ProposalType(StrEnum):
     TRAINING_PLAN = "training_plan"
 
 
+class ProposalOperation(StrEnum):
+    """训练计划 Proposal 操作类型。"""
+
+    CREATE = "create"
+    REPLACE = "replace"
+    ADJUST = "adjust"
+
+
 class ProposalStatus(StrEnum):
     """人工确认提案状态。"""
 
     PENDING = "pending"
+    APPROVING = "approving"
     APPROVED = "approved"
     REJECTED = "rejected"
+    SUPERSEDED = "superseded"
+
+def can_transition_proposal_status(
+    current: ProposalStatus,
+    target: ProposalStatus,
+) -> bool:
+    """
+    判断训练计划 Proposal 是否允许进行指定状态转换。
+
+    :param current: 当前 Proposal 状态。
+    :param target: 目标 Proposal 状态。
+    :return: 状态转换符合领域规则时返回 True。
+    """
+    if current == ProposalStatus.PENDING:
+        return target in {
+            ProposalStatus.APPROVING,
+            ProposalStatus.REJECTED,
+            ProposalStatus.SUPERSEDED,
+        }
+
+    if current == ProposalStatus.APPROVING:
+        return target == ProposalStatus.APPROVED
+
+    return False
 
 
 class ProposalDecision(StrEnum):
@@ -38,9 +72,15 @@ class TrainingPlanProposalResponse(BaseModel):
 
     id: int
     type: ProposalType
+    operation: ProposalOperation
+    target_week_start: date
+    base_plan_id: int | None = Field(default=None, gt=0)
+    parent_proposal_id: int | None = Field(default=None, gt=0)
+    revision: int = Field(ge=1)
     status: ProposalStatus
     plan: TrainingPlanDraft
     safety_check: SafetyCheckResult
+    generation_summary: str = Field(min_length=1, max_length=1000)
     approved_plan_id: int | None = None
     decision_note: str | None = None
     created_at: str

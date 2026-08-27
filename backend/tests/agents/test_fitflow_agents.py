@@ -3,7 +3,6 @@ from app.ai.tools.fitness import (
     ASSESS_RISK_TOOL,
     GENERATE_TRAINING_PLAN_TOOL,
     GET_PROFILE_TOOL,
-    SAVE_TRAINING_PLAN_TOOL,
     VALIDATE_TRAINING_PLAN_TOOL,
 )
 from app.ai.agents.single.planner import create_training_plan_agent
@@ -33,7 +32,6 @@ def test_training_plan_agent_exposes_deterministic_steps_as_tools(tmp_path):
     db_path = tmp_path / "fitflow.db"
     agent = create_training_plan_agent(
         profile_repository=ProfileRepository(db_path),
-        training_plan_repository=TrainingPlanRepository(db_path),
     )
 
     assert agent.tool_registry.names() == (
@@ -41,18 +39,16 @@ def test_training_plan_agent_exposes_deterministic_steps_as_tools(tmp_path):
         ASSESS_RISK_TOOL,
         GENERATE_TRAINING_PLAN_TOOL,
         VALIDATE_TRAINING_PLAN_TOOL,
-        SAVE_TRAINING_PLAN_TOOL,
     )
 
 
-def test_training_plan_agent_runs_and_persists_a_safe_plan(tmp_path):
+def test_training_plan_agent_returns_validated_safe_draft(tmp_path):
     db_path = tmp_path / "fitflow.db"
     profiles = ProfileRepository(db_path)
     plans = TrainingPlanRepository(db_path)
     profiles.save("safe-user", build_profile())
     agent = create_training_plan_agent(
         profile_repository=profiles,
-        training_plan_repository=plans,
     )
 
     result = agent.run("safe-user")
@@ -60,7 +56,7 @@ def test_training_plan_agent_runs_and_persists_a_safe_plan(tmp_path):
     assert result.status_code == 201
     assert result.response is not None
     assert result.response.safety_check.valid is True
-    assert len(plans.list_by_user("safe-user")) == 1
+    assert plans.list_by_user("safe-user") == []
 
 
 def test_coach_agent_uses_tools_but_keeps_llm_out_of_blocked_path(tmp_path):

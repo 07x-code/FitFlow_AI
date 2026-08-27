@@ -16,6 +16,7 @@ from app.domain.models.plan import (
     TrainingPlanDraft,
     TrainingPlanDraftResponse,
     TrainingPlanExplanationResponse,
+    TrainingPlanStatus,
     TrainingPlanHistoryItem,
     TrainingPlanHistoryResponse,
     WorkoutDayDraft,
@@ -32,6 +33,7 @@ from app.domain.models.proposal import (
     ProposalDecision,
     ProposalDecisionRequest,
     ProposalListResponse,
+    ProposalOperation,
     ProposalStatus,
     ProposalType,
     TrainingPlanProposalResponse,
@@ -72,6 +74,7 @@ __all__ = [
     "ProposalDecision",
     "ProposalDecisionRequest",
     "ProposalListResponse",
+    "ProposalOperation",
     "ProposalStatus",
     "ProposalType",
     "RiskAssessment",
@@ -80,6 +83,7 @@ __all__ = [
     "TrainingPlanDraft",
     "TrainingPlanDraftResponse",
     "TrainingPlanExplanationResponse",
+    "TrainingPlanStatus",
     "TrainingPlanHistoryItem",
     "TrainingPlanHistoryResponse",
     "TrainingPlanProposalResponse",
@@ -97,4 +101,5 @@ __all__ = [
     "WorkoutSessionCreate",
     "WorkoutSessionResponse",
     "WorkoutSetLog",
+    
 ]

@@ -27,7 +27,7 @@ class TrainingPlanUseCases:
 
     def create_draft(self, user_id: str) -> TrainingPlanDraftResponse:
         """
-        通过训练计划 Agent 生成并保存安全计划。
+        通过训练计划 Agent 生成并校验训练计划草案。
 
         :param user_id: 用户标识。
         :return: 训练计划草案与安全检查结果。

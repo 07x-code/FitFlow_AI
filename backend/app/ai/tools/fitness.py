@@ -1,3 +1,4 @@
+from datetime import date
 from dataclasses import dataclass
 
 from app.ai.tools.base import Tool, ToolParameter
@@ -12,6 +13,7 @@ from app.domain.models import (
     UserMemoryResponse,
 )
 from app.domain.plan_generator import generate_beginner_plan
+from app.domain.plan_schedule import get_next_week_start
 from app.domain.risk_rules import assess_risk
 from app.domain.training_rules import validate_beginner_plan
 from app.ports.knowledge import KnowledgeRetrieverPort
@@ -26,17 +28,13 @@ GET_PROFILE_TOOL = "get_profile"
 ASSESS_RISK_TOOL = "assess_risk"
 GENERATE_TRAINING_PLAN_TOOL = "generate_training_plan"
 VALIDATE_TRAINING_PLAN_TOOL = "validate_training_plan"
-SAVE_TRAINING_PLAN_TOOL = "save_training_plan"
+
 GET_LATEST_TRAINING_PLAN_TOOL = "get_latest_training_plan"
 RECALL_USER_MEMORY_TOOL = "recall_user_memory"
 RETRIEVE_FITNESS_KNOWLEDGE_TOOL = "retrieve_fitness_knowledge"
 
 
-@dataclass(frozen=True)
-class SaveTrainingPlanInput:
-    user_id: str
-    plan: TrainingPlanDraft
-    safety_check: SafetyCheckResult
+
 
 
 @dataclass(frozen=True)
@@ -98,7 +96,20 @@ class GenerateTrainingPlanTool(
         )
 
     def run(self, tool_input: FitnessProfileCreate) -> TrainingPlanDraft:
-        return generate_beginner_plan(tool_input)
+        """
+        根据用户画像生成默认目标为下周的训练计划。
+
+        :param tool_input: 已通过风险检查的用户健身画像。
+        :return: 包含目标周信息的训练计划草案。
+        """
+        return generate_beginner_plan(
+            tool_input,
+            week_start=get_next_week_start(date.today()),
+            timezone="Asia/Shanghai",
+            goal_summary=(
+                f"围绕 {tool_input.goal.value} 目标安排下周训练。"
+            ),
+        )
 
 
 class ValidateTrainingPlanTool(
@@ -121,32 +132,7 @@ class ValidateTrainingPlanTool(
         return SafetyCheckResult.model_validate(validate_beginner_plan(tool_input))
 
 
-class SaveTrainingPlanTool(
-    Tool[SaveTrainingPlanInput, TrainingPlanHistoryItem]
-):
-    def __init__(self, repository: TrainingPlanRepositoryPort) -> None:
-        super().__init__(
-            name=SAVE_TRAINING_PLAN_TOOL,
-            description="仅在安全检查通过后持久化训练计划。",
-            parameters=(
-                ToolParameter(
-                    name="input",
-                    description="用户、训练计划与安全检查结果的组合输入。",
-                    type_name="SaveTrainingPlanInput",
-                ),
-            ),
-        )
-        self.repository = repository
 
-    def run(self, tool_input: SaveTrainingPlanInput) -> TrainingPlanHistoryItem:
-        if not tool_input.safety_check.valid:
-            raise ValueError("Cannot save a training plan that failed safety checks.")
-
-        return self.repository.save(
-            tool_input.user_id,
-            tool_input.plan,
-            tool_input.safety_check,
-        )
 
 
 class GetLatestTrainingPlanTool(
@@ -221,14 +207,18 @@ class RetrieveFitnessKnowledgeTool(
 def create_training_plan_tool_registry(
     *,
     profile_repository: ProfileRepositoryPort,
-    training_plan_repository: TrainingPlanRepositoryPort,
 ) -> ToolRegistry:
+    """
+    创建只负责生成和校验草案的训练计划工具注册表。
+
+    :param profile_repository: 用户画像仓储端口。
+    :return: 已注册确定性规划工具的注册表。
+    """
     registry = ToolRegistry()
     registry.register(GetProfileTool(profile_repository))
     registry.register(AssessRiskTool())
     registry.register(GenerateTrainingPlanTool())
     registry.register(ValidateTrainingPlanTool())
-    registry.register(SaveTrainingPlanTool(training_plan_repository))
     return registry
 
 

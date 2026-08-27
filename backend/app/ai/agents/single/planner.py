@@ -12,7 +12,6 @@ from app.ai.tools.registry import ToolRegistry
 from app.domain.models import TrainingPlanDraftResponse
 from app.ports.repositories import (
     ProfileRepositoryPort,
-    TrainingPlanRepositoryPort,
 )
 
 
@@ -39,7 +38,7 @@ class TrainingPlanAgent(Agent[str, TrainingPlanAgentResult]):
             name="training-plan-agent",
             system_prompt=(
                 "Create beginner plans only after profile and risk checks, "
-                "validate every plan, and persist only safe results."
+                "and return only plans that pass deterministic validation."
             ),
         )
         self.tool_registry = tool_registry
@@ -78,14 +77,12 @@ class TrainingPlanAgent(Agent[str, TrainingPlanAgentResult]):
 def create_training_plan_agent(
     *,
     profile_repository: ProfileRepositoryPort,
-    training_plan_repository: TrainingPlanRepositoryPort,
     tool_registry: ToolRegistry | None = None,
 ) -> TrainingPlanAgent:
     """
     创建完成工具装配的训练计划 Agent。
 
     :param profile_repository: 用户画像仓储端口。
-    :param training_plan_repository: 训练计划仓储端口。
     :param tool_registry: 可选的自定义工具注册表。
     :return: 已完成依赖装配的训练计划 Agent。
     """
@@ -93,6 +90,5 @@ def create_training_plan_agent(
         tool_registry=tool_registry
         or create_training_plan_tool_registry(
             profile_repository=profile_repository,
-            training_plan_repository=training_plan_repository,
         )
     )

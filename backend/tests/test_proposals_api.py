@@ -51,6 +51,11 @@ def get_history(client: TestClient, user_id: str) -> dict:
 
 
 def test_create_training_plan_proposal_does_not_save_history():
+    """
+    验证初始训练计划 Proposal 包含目标周和修订元数据。
+
+    :return: 无返回值。
+    """
     client = TestClient(app)
     user_id = unique_user_id("proposal-user")
     save_profile(client, user_id)
@@ -62,6 +67,12 @@ def test_create_training_plan_proposal_does_not_save_history():
     )
 
     assert body["type"] == "training_plan"
+    assert body["operation"] == "create"
+    assert body["target_week_start"] == body["plan"]["week_start"]
+    assert body["base_plan_id"] is None
+    assert body["parent_proposal_id"] is None
+    assert body["revision"] == 1
+    assert body["generation_summary"] == body["plan"]["goal_summary"]
     assert body["status"] == "pending"
     assert body["approved_plan_id"] is None
     assert body["decision_note"] is None

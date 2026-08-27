@@ -7,9 +7,9 @@ from app.ai.tools.fitness import (
     ASSESS_RISK_TOOL,
     GENERATE_TRAINING_PLAN_TOOL,
     GET_PROFILE_TOOL,
-    SAVE_TRAINING_PLAN_TOOL,
+    
     VALIDATE_TRAINING_PLAN_TOOL,
-    SaveTrainingPlanInput,
+    
 )
 from app.ai.tools.registry import ToolRegistry
 from app.domain.models import (
@@ -17,7 +17,6 @@ from app.domain.models import (
     RiskAssessment,
     SafetyCheckResult,
     TrainingPlanDraft,
-    TrainingPlanHistoryItem,
 )
 
 
@@ -29,7 +28,6 @@ class TrainingPlanAgentState(TypedDict, total=False):
     risk: RiskAssessment
     plan: TrainingPlanDraft
     safety_check: SafetyCheckResult
-    saved_plan: TrainingPlanHistoryItem
     error_status_code: int
     error_detail: Any
 
@@ -62,7 +60,7 @@ class TrainingPlanGraphBuilder:
         workflow.add_node("generate_plan", self._generate_plan)
         workflow.add_node("validate_plan", self._validate_plan)
         workflow.add_node("reject_unsafe_plan", self._reject_unsafe_plan)
-        workflow.add_node("save_plan", self._save_plan)
+        
 
         workflow.add_edge(START, "load_profile")
         workflow.add_conditional_edges(
@@ -87,12 +85,11 @@ class TrainingPlanGraphBuilder:
             "validate_plan",
             self._route_after_safety_check,
             {
-                "safe_plan": "save_plan",
+                "safe_plan": END,
                 "unsafe_plan": "reject_unsafe_plan",
             },
         )
         workflow.add_edge("reject_unsafe_plan", END)
-        workflow.add_edge("save_plan", END)
         return workflow.compile()
 
     def _load_profile(
@@ -224,7 +221,7 @@ class TrainingPlanGraphBuilder:
         根据安全校验结果决定保存或拒绝计划。
 
         :param state: 包含安全检查的工作流状态。
-        :return: 安全计划或不安全计划的路由名称。
+        :return: 安全计划或拒绝计划的路由名称。
         """
         return "safe_plan" if state["safety_check"].valid else "unsafe_plan"
 
@@ -246,28 +243,6 @@ class TrainingPlanGraphBuilder:
             },
         }
 
-    def _save_plan(
-        self,
-        state: TrainingPlanAgentState,
-    ) -> TrainingPlanAgentState:
-        """
-        保存已通过安全检查的训练计划。
-
-        :param state: 包含安全训练计划的工作流状态。
-        :return: 包含已保存计划的状态更新。
-        """
-        saved_plan = cast(
-            TrainingPlanHistoryItem,
-            self.tool_registry.execute(
-                SAVE_TRAINING_PLAN_TOOL,
-                SaveTrainingPlanInput(
-                    user_id=state["user_id"],
-                    plan=state["plan"],
-                    safety_check=state["safety_check"],
-                ),
-            ),
-        )
-        return {"saved_plan": saved_plan}
 
 
 def create_training_plan_graph(tool_registry: ToolRegistry):

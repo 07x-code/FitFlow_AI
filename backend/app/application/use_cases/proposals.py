@@ -1,3 +1,5 @@
+from datetime import date
+
 from dataclasses import dataclass
 
 from app.application.errors import ConflictError, NotFoundError, UnprocessableError
@@ -10,6 +12,7 @@ from app.domain.models import (
     TrainingPlanProposalResponse,
 )
 from app.domain.plan_generator import generate_beginner_plan
+from app.domain.plan_schedule import get_next_week_start
 from app.domain.risk_rules import assess_risk
 from app.domain.training_rules import validate_beginner_plan
 from app.ports.repositories import (
@@ -17,6 +20,7 @@ from app.ports.repositories import (
     TrainingPlanProposalRepositoryPort,
     TrainingPlanRepositoryPort,
 )
+DEFAULT_PLAN_TIMEZONE = "Asia/Shanghai"
 
 
 @dataclass(frozen=True)
@@ -50,7 +54,15 @@ class ProposalUseCases:
                 }
             )
 
-        plan = generate_beginner_plan(profile)
+        week_start = get_next_week_start(date.today())
+        plan = generate_beginner_plan(
+            profile,
+            week_start=week_start,
+            timezone=DEFAULT_PLAN_TIMEZONE,
+            goal_summary=(
+                f"围绕 {profile.goal.value} 目标安排下周训练。"
+            ),
+        )
         safety_check = SafetyCheckResult.model_validate(
             validate_beginner_plan(plan)
         )
