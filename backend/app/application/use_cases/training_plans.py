@@ -25,14 +25,14 @@ class TrainingPlanUseCases:
     agent: TrainingPlanAgentPort
     explainer: TrainingPlanExplainerPort
 
-    def create_draft(self, user_id: str) -> TrainingPlanDraftResponse:
+    async def create_draft(self, user_id: str) -> TrainingPlanDraftResponse:
         """
         通过训练计划 Agent 生成并校验训练计划草案。
 
         :param user_id: 用户标识。
         :return: 训练计划草案与安全检查结果。
         """
-        result = self.agent.run(user_id)
+        result = await self.agent.run(user_id)
         if result.response is not None:
             return result.response
 
@@ -44,7 +44,7 @@ class TrainingPlanUseCases:
             raise UnprocessableError(result.error_detail)
         raise InvalidRequestError(result.error_detail)
 
-    def list_history(self, user_id: str) -> TrainingPlanHistoryResponse:
+    async def list_history(self, user_id: str) -> TrainingPlanHistoryResponse:
         """
         查询用户训练计划历史。
 
@@ -52,10 +52,10 @@ class TrainingPlanUseCases:
         :return: 训练计划历史响应。
         """
         return TrainingPlanHistoryResponse(
-            plans=self.repository.list_by_user(user_id)
+            plans=await self.repository.list_by_user(user_id)
         )
 
-    def get_detail(
+    async def get_detail(
         self,
         user_id: str,
         plan_id: int,
@@ -67,12 +67,12 @@ class TrainingPlanUseCases:
         :param plan_id: 训练计划标识。
         :return: 训练计划详情。
         """
-        plan = self.repository.get_by_id_for_user(user_id, plan_id)
+        plan = await self.repository.get_by_id_for_user(user_id, plan_id)
         if plan is None:
             raise NotFoundError("Training plan not found.")
         return plan
 
-    def explain(
+    async def explain(
         self,
         user_id: str,
         plan_id: int,
@@ -84,5 +84,5 @@ class TrainingPlanUseCases:
         :param plan_id: 训练计划标识。
         :return: 训练计划解释。
         """
-        plan = self.get_detail(user_id, plan_id)
+        plan = await self.get_detail(user_id, plan_id)
         return self.explainer.explain_training_plan(plan)

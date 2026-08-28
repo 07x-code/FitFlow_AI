@@ -1,8 +1,21 @@
 from uuid import uuid4
+from collections.abc import Iterator
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
+
+
+@pytest.fixture
+def client() -> Iterator[TestClient]:
+    """
+    创建已运行 FastAPI 生命周期的测试客户端。
+
+    :return: 已连接测试数据库的客户端。
+    """
+    with TestClient(app) as test_client:
+        yield test_client
 
 
 def unique_user_id(prefix: str) -> str:
@@ -27,19 +40,34 @@ def save_profile(client: TestClient, user_id: str) -> None:
     assert response.status_code == 201
 
 
-def create_plan_and_get_id(client: TestClient, user_id: str) -> int:
-    response = client.post(
-        "/api/training-plans/draft",
-        headers={"X-User-ID": user_id},
-    )
-    assert response.status_code == 201
+def create_plan_and_get_id(
+    client: TestClient,
+    user_id: str,
+) -> int:
+    """
+    创建并批准 Proposal，返回生成的正式计划标识。
 
-    history_response = client.get(
-        "/api/training-plans/history",
+    :param client: 测试客户端。
+    :param user_id: 用户标识。
+    :return: 批准 Proposal 后生成的正式计划标识。
+    """
+    proposal_response = client.post(
+        "/api/proposals/training-plan",
         headers={"X-User-ID": user_id},
     )
-    assert history_response.status_code == 200
-    return history_response.json()["plans"][0]["id"]
+    assert proposal_response.status_code == 201
+
+    proposal_id = proposal_response.json()["id"]
+    decision_response = client.post(
+        f"/api/proposals/{proposal_id}/decision",
+        headers={"X-User-ID": user_id},
+        json={"decision": "approve"},
+    )
+    assert decision_response.status_code == 200
+
+    plan_id = decision_response.json()["approved_plan_id"]
+    assert plan_id is not None
+    return plan_id
 
 
 def submit_workout(
@@ -74,8 +102,7 @@ def submit_workout(
     assert response.status_code == 201
 
 
-def test_weekly_report_summarizes_workouts_without_adjustment_for_safe_feedback():
-    client = TestClient(app)
+def test_weekly_report_summarizes_workouts_without_adjustment_for_safe_feedback(client: TestClient,):
     user_id = unique_user_id("weekly-safe-user")
     save_profile(client, user_id)
     plan_id = create_plan_and_get_id(client, user_id)
@@ -101,8 +128,7 @@ def test_weekly_report_summarizes_workouts_without_adjustment_for_safe_feedback(
     assert body["recommendation"] == "本周反馈整体稳定，暂时保持当前训练计划。"
 
 
-def test_weekly_report_creates_lower_rpe_proposal_for_high_pain_or_fatigue():
-    client = TestClient(app)
+def test_weekly_report_creates_lower_rpe_proposal_for_high_pain_or_fatigue(client: TestClient,):
     user_id = unique_user_id("weekly-adjust-user")
     save_profile(client, user_id)
     plan_id = create_plan_and_get_id(client, user_id)
@@ -129,3 +155,5 @@ def test_weekly_report_creates_lower_rpe_proposal_for_high_pain_or_fatigue():
     assert proposal["plan"]["days"][0]["exercises"][0]["target_rpe"] == 6
     assert proposals_response.status_code == 200
     assert proposals_response.json()["proposals"][0]["id"] == proposal["id"]
+    assert proposal["operation"] == "replace"
+    assert proposal["base_plan_id"] == plan_id

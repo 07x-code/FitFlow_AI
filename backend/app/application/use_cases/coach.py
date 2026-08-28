@@ -11,7 +11,7 @@ class CoachUseCases:
 
     agent: CoachAgentPort
 
-    def chat(
+    async def chat(
         self,
         user_id: str,
         session_id: str,
@@ -25,7 +25,7 @@ class CoachUseCases:
         :param request: 教练对话请求。
         :return: AI 教练回复。
         """
-        response = self.agent.chat(user_id, session_id, request)
+        response = await self.agent.chat(user_id, session_id, request)
         if response is None:
             raise NotFoundError("Profile not found.")
         return response

@@ -44,7 +44,7 @@ class TrainingPlanAgent(Agent[str, TrainingPlanAgentResult]):
         self.tool_registry = tool_registry
         self.graph = create_training_plan_graph(tool_registry)
 
-    def run(
+    async def run(
         self,
         agent_input: str,
         **kwargs: object,
@@ -56,7 +56,7 @@ class TrainingPlanAgent(Agent[str, TrainingPlanAgentResult]):
         :param kwargs: 预留的 Agent 扩展参数。
         :return: 训练计划生成结果。
         """
-        final_state: TrainingPlanAgentState = self.graph.invoke(
+        final_state: TrainingPlanAgentState = await self.graph.ainvoke(
             {"user_id": agent_input}
         )
         if "error_status_code" in final_state:

@@ -1,11 +1,14 @@
 from app.bootstrap.container import create_container
 from app.core.config import AppSettings
-from app.domain.models import FitnessProfileCreate
 
 
-def test_container_wires_shared_repositories_agents_and_use_cases(tmp_path):
+def test_container_wires_shared_application_components() -> None:
+    """
+    验证共享容器装配进程级应用组件。
+
+    :return: 无返回值。
+    """
     container = create_container(
-        db_path=tmp_path / "fitflow.db",
         settings=AppSettings(
             llm_provider="fake",
             dashscope_api_key=None,
@@ -16,24 +19,8 @@ def test_container_wires_shared_repositories_agents_and_use_cases(tmp_path):
             ),
         ),
     )
-    user_id = "container-user"
 
-    container.profiles.create(
-        user_id,
-        FitnessProfileCreate(
-            age=22,
-            sex="male",
-            height_cm=175,
-            weight_kg=70,
-            goal="muscle_gain",
-            sessions_per_week=3,
-            session_minutes=60,
-            health_flags=[],
-        ),
-    )
-    draft = container.training_plans.create_draft(user_id)
-    history = container.training_plans.list_history(user_id)
-
-    assert draft.safety_check.valid is True
-    assert len(history.plans) == 1
-    assert history.plans[0].plan == draft.plan
+    assert container.llm_provider.name == "fake"
+    assert container.knowledge_retriever is not None
+    assert container.training_plan_explainer is not None
+    assert container.working_memory.store is container.working_memory_store

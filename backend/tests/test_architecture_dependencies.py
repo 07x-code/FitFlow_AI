@@ -160,14 +160,23 @@ def test_legacy_compatibility_directories_are_removed() -> None:
     assert not (APP_ROOT / "workflows").exists()
 
 
-def test_sqlite_repositories_are_grouped_under_persistence() -> None:
-    sqlite_root = APP_ROOT / "infrastructure" / "persistence" / "sqlite"
+def test_postgres_repositories_are_grouped_under_persistence() -> None:
+    """
+    验证 PostgreSQL Repository 集中位于持久化基础设施目录。
+
+    :return: 无返回值。
+    """
+    postgres_root = (
+        APP_ROOT / "infrastructure" / "persistence" / "postgres"
+    )
+
     assert {
-        path.name for path in sqlite_root.glob("*_repository.py")
+        path.name
+        for path in postgres_root.glob("*_repository.py")
     } == {
         "profile_repository.py",
         "proposal_repository.py",
         "training_plan_repository.py",
         "user_memory_repository.py",
-        "workout_repository.py",
+        "workout_session_repository.py",
     }

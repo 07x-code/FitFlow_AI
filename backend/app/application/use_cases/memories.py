@@ -15,7 +15,7 @@ class MemoryUseCases:
 
     repository: UserMemoryRepositoryPort
 
-    def create(
+    async def create(
         self,
         user_id: str,
         memory: UserMemoryCreate,
@@ -27,20 +27,21 @@ class MemoryUseCases:
         :param memory: 待保存的记忆。
         :return: 已保存的记忆。
         """
-        return self.repository.create(user_id=user_id, memory=memory)
+        return await self.repository.create(user_id=user_id, memory=memory)
 
-    def list(self, user_id: str) -> UserMemoryListResponse:
+    async def list(self, user_id: str) -> UserMemoryListResponse:
         """
         查询用户长期记忆。
 
         :param user_id: 用户标识。
         :return: 用户长期记忆列表响应。
         """
+        memories = await self.repository.list_by_user(user_id)
         return UserMemoryListResponse(
-            memories=self.repository.list_by_user(user_id)
+            memories=memories
         )
 
-    def delete(self, user_id: str, memory_id: int) -> None:
+    async def delete(self, user_id: str, memory_id: int) -> None:
         """
         删除属于当前用户的长期记忆。
 
@@ -48,7 +49,7 @@ class MemoryUseCases:
         :param memory_id: 记忆标识。
         :return: 无返回值。
         """
-        deleted = self.repository.delete_by_id_for_user(
+        deleted = await self.repository.delete_by_id_for_user(
             user_id=user_id,
             memory_id=memory_id,
         )

@@ -92,25 +92,29 @@ class TrainingPlanGraphBuilder:
         workflow.add_edge("reject_unsafe_plan", END)
         return workflow.compile()
 
-    def _load_profile(
+    async def _load_profile(
         self,
         state: TrainingPlanAgentState,
     ) -> TrainingPlanAgentState:
         """
-        从工具端口加载用户画像。
+        从工具端口异步加载用户画像。
 
         :param state: 当前工作流状态。
         :return: 包含画像或未找到错误的状态更新。
         """
         profile = cast(
             FitnessProfileCreate | None,
-            self.tool_registry.execute(GET_PROFILE_TOOL, state["user_id"]),
+            await self.tool_registry.execute_async(
+                GET_PROFILE_TOOL,
+                state["user_id"],
+            ),
         )
         if profile is None:
             return {
                 "error_status_code": HTTPStatus.NOT_FOUND,
                 "error_detail": "Profile not found.",
             }
+
         return {"profile": profile}
 
     @staticmethod

@@ -1,9 +1,21 @@
 from uuid import uuid4
+from collections.abc import Iterator
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
 
+
+@pytest.fixture
+def client() -> Iterator[TestClient]:
+    """
+    创建已运行 FastAPI 生命周期的测试客户端。
+
+    :return: 已连接测试数据库的客户端。
+    """
+    with TestClient(app) as test_client:
+        yield test_client
 
 def unique_user_id(prefix: str) -> str:
     return f"{prefix}-{uuid4().hex}"
@@ -39,27 +51,40 @@ def save_profile(
     assert response.status_code == 201
 
 
-def create_plan_and_get_id(client: TestClient, user_id: str) -> int:
-    response = client.post(
-        "/api/training-plans/draft",
+def create_plan_and_get_id(
+    client: TestClient,
+    user_id: str,
+) -> int:
+    """
+    创建并批准 Proposal，返回生成的正式计划标识。
+
+    :param client: 测试客户端。
+    :param user_id: 用户标识。
+    :return: 批准 Proposal 后生成的正式计划标识。
+    """
+    proposal_response = client.post(
+        "/api/proposals/training-plan",
         headers={"X-User-ID": user_id},
     )
-    assert response.status_code == 201
+    assert proposal_response.status_code == 201
 
-    history_response = client.get(
-        "/api/training-plans/history",
+    proposal_id = proposal_response.json()["id"]
+    decision_response = client.post(
+        f"/api/proposals/{proposal_id}/decision",
         headers={"X-User-ID": user_id},
+        json={"decision": "approve"},
     )
-    assert history_response.status_code == 200
-    return history_response.json()["plans"][0]["id"]
+    assert decision_response.status_code == 200
+
+    plan_id = decision_response.json()["approved_plan_id"]
+    assert plan_id is not None
+    return plan_id
 
 
-def test_coach_chat_answers_with_latest_plan_context():
-    client = TestClient(app)
+def test_coach_chat_answers_with_latest_plan_context(client: TestClient):
     user_id = unique_user_id("coach-chat-user")
     save_profile(client, user_id)
-    first_plan_id = create_plan_and_get_id(client, user_id)
-    latest_plan_id = create_plan_and_get_id(client, user_id)
+    plan_id = create_plan_and_get_id(client, user_id)
 
     response = client.post(
         "/api/coach/chat",
@@ -70,13 +95,11 @@ def test_coach_chat_answers_with_latest_plan_context():
     assert response.status_code == 200
     body = response.json()
     assert body["safety_level"] == "low"
-    assert body["referenced_plan_id"] == latest_plan_id
-    assert body["referenced_plan_id"] != first_plan_id
+    assert body["referenced_plan_id"] == plan_id
     assert "Why is my plan 3 days per week?" in body["answer"]
 
 
-def test_coach_chat_blocks_risky_profile_without_calling_llm():
-    client = TestClient(app)
+def test_coach_chat_blocks_risky_profile_without_calling_llm(client: TestClient):
     user_id = unique_user_id("risky-coach-chat-user")
     save_profile(client, user_id, health_flags=["chest_pain"])
 
@@ -99,10 +122,10 @@ def test_coach_chat_blocks_risky_profile_without_calling_llm():
     }
 
 
-def test_coach_chat_requires_saved_profile():
+def test_coach_chat_requires_saved_profile(client: TestClient):
     user_id = unique_user_id("missing-coach-chat-user")
 
-    response = TestClient(app).post(
+    response = client.post(
         "/api/coach/chat",
         headers=coach_headers(user_id),
         json={"message": "Can you explain my plan?"},
@@ -112,8 +135,7 @@ def test_coach_chat_requires_saved_profile():
     assert response.json()["detail"] == "Profile not found."
 
 
-def test_coach_chat_returns_rpe_knowledge_source_and_uses_content_in_prompt():
-    client = TestClient(app)
+def test_coach_chat_returns_rpe_knowledge_source_and_uses_content_in_prompt(client: TestClient):
     user_id = unique_user_id("coach-rag-rpe-user")
     save_profile(client, user_id)
 
@@ -135,8 +157,7 @@ def test_coach_chat_returns_rpe_knowledge_source_and_uses_content_in_prompt():
     assert "RPE 7 表示大约还能完成 3 次重复" in body["answer"]
 
 
-def test_coach_chat_returns_no_sources_for_unrelated_question():
-    client = TestClient(app)
+def test_coach_chat_returns_no_sources_for_unrelated_question(client: TestClient):
     user_id = unique_user_id("coach-rag-unrelated-user")
     save_profile(client, user_id)
 

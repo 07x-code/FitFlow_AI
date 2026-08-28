@@ -11,17 +11,32 @@ router = APIRouter(prefix="/api/profiles", tags=["profiles"])
 
 
 @router.post("", response_model=ProfileAssessmentResponse, status_code=status.HTTP_201_CREATED)
-def create_profile(
+async def create_profile(
     profile: FitnessProfileCreate,
     user_id: Annotated[str, Header(alias="X-User-ID")],
     use_cases: Annotated[ProfileUseCases, Depends(get_profile_use_cases)],
 ) -> ProfileAssessmentResponse:
-    return use_cases.create(user_id, profile)
+    """
+    创建或更新当前用户的健身画像。
+
+    :param profile: 待保存的健身画像。
+    :param user_id: 当前用户标识。
+    :param use_cases: 用户画像应用用例。
+    :return: 用户画像评估结果。
+    """
+    return await use_cases.create(user_id, profile) 
 
 
 @router.get("/me", response_model=ProfileAssessmentResponse)
-def get_my_profile(
+async def get_my_profile(
     user_id: Annotated[str, Header(alias="X-User-ID")],
     use_cases: Annotated[ProfileUseCases, Depends(get_profile_use_cases)],
 ) -> ProfileAssessmentResponse:
-    return use_cases.get(user_id)
+    """
+    查询当前用户的健身画像。
+
+    :param user_id: 当前用户标识。
+    :param use_cases: 用户画像应用用例。
+    :return: 用户画像评估结果。
+    """
+    return await use_cases.get(user_id)

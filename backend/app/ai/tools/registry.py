@@ -1,4 +1,5 @@
 from typing import Any, Callable
+from inspect import isawaitable
 
 from app.ai.tools.base import FunctionTool, Tool, ToolParameter
 
@@ -56,6 +57,26 @@ class ToolRegistry:
 
     def execute(self, name: str, tool_input: Any) -> Any:
         return self.get(name).run(tool_input)
+
+    async def execute_async(
+        self,
+        name: str,
+        tool_input: Any,
+    ) -> Any:
+        """
+        执行工具，并等待工具返回的异步结果。
+
+        同步领域工具可以继续直接返回结果，异步 Repository
+        工具返回的协程会在这里等待完成。
+
+        :param name: 工具名称。
+        :param tool_input: 工具输入。
+        :return: 工具最终执行结果。
+        """
+        result = self.execute(name, tool_input)
+        if isawaitable(result):
+            return await result
+        return result
 
     def list_tools(self) -> tuple[Tool[Any, Any], ...]:
         return tuple(self._tools.values())

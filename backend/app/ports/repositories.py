@@ -1,5 +1,5 @@
 from typing import Protocol
-
+from datetime import datetime
 from app.domain.models import (
     FitnessProfileCreate,
     SafetyCheckResult,
@@ -17,7 +17,7 @@ from app.domain.models import (
 class ProfileRepositoryPort(Protocol):
     """用户健身画像持久化端口。"""
 
-    def save(self, user_id: str, profile: FitnessProfileCreate) -> None:
+    async def save(self, user_id: str, profile: FitnessProfileCreate) -> None:
         """
         保存用户健身画像。
 
@@ -26,7 +26,7 @@ class ProfileRepositoryPort(Protocol):
         :return: 无返回值。
         """
 
-    def get(self, user_id: str) -> FitnessProfileCreate | None:
+    async def get(self, user_id: str) -> FitnessProfileCreate | None:
         """
         查询用户健身画像。
 
@@ -36,49 +36,69 @@ class ProfileRepositoryPort(Protocol):
 
 
 class TrainingPlanRepositoryPort(Protocol):
-    """训练计划持久化端口。"""
+    """正式训练计划持久化端口。"""
 
-    def save(
+    async def save(
         self,
         user_id: str,
         plan: TrainingPlanDraft,
         safety_check: SafetyCheckResult,
+        *,
+        source_proposal_id: int,
+        version: int,
     ) -> TrainingPlanHistoryItem:
         """
-        保存已通过安全检查的训练计划。
+        保存由已批准 Proposal 生成的正式训练计划。
 
         :param user_id: 用户标识。
-        :param plan: 训练计划。
-        :param safety_check: 安全检查结果。
-        :return: 已保存的训练计划。
+        :param plan: 已通过校验的训练计划草案。
+        :param safety_check: 确定性安全检查结果。
+        :param source_proposal_id: 来源 Proposal 标识。
+        :param version: 同一用户同一周的计划版本。
+        :return: 已保存的正式训练计划。
         """
 
-    def list_by_user(self, user_id: str) -> list[TrainingPlanHistoryItem]:
+    async def list_by_user(
+        self,
+        user_id: str,
+    ) -> list[TrainingPlanHistoryItem]:
         """
-        查询用户的训练计划历史。
+        查询用户的正式训练计划历史。
 
         :param user_id: 用户标识。
-        :return: 按时间倒序排列的训练计划列表。
+        :return: 按时间倒序排列的正式训练计划列表。
         """
 
-    def get_by_id_for_user(
+    async def get_by_id_for_user(
         self,
         user_id: str,
         plan_id: int,
     ) -> TrainingPlanHistoryItem | None:
         """
-        按用户和计划标识查询训练计划。
+        按用户和计划标识查询正式训练计划。
 
         :param user_id: 用户标识。
-        :param plan_id: 训练计划标识。
-        :return: 训练计划；不存在或不属于该用户时返回 None。
+        :param plan_id: 正式训练计划标识。
+        :return: 正式训练计划；不存在或不属于该用户时返回 None。
         """
 
+    async def mark_superseded(
+        self,
+        user_id: str,
+        plan_id: int,
+    ) -> TrainingPlanHistoryItem | None:
+        """
+        将用户当前正式计划更新为已被替换。
+
+        :param user_id: 用户标识。
+        :param plan_id: 正式训练计划标识。
+        :return: 更新后的正式计划；当前状态不允许更新时返回 None。
+        """
 
 class UserMemoryRepositoryPort(Protocol):
     """用户长期记忆持久化端口。"""
 
-    def create(
+    async def create(
         self,
         user_id: str,
         memory: UserMemoryCreate,
@@ -91,7 +111,10 @@ class UserMemoryRepositoryPort(Protocol):
         :return: 已保存的记忆。
         """
 
-    def list_by_user(self, user_id: str) -> list[UserMemoryResponse]:
+    async def list_by_user(
+            self,
+            user_id: str
+    ) -> list[UserMemoryResponse]:
         """
         查询用户长期记忆。
 
@@ -99,7 +122,7 @@ class UserMemoryRepositoryPort(Protocol):
         :return: 用户长期记忆列表。
         """
 
-    def delete_by_id_for_user(self, user_id: str, memory_id: int) -> bool:
+    async def delete_by_id_for_user(self, user_id: str, memory_id: int) -> bool:
         """
         删除属于指定用户的长期记忆。
 
@@ -112,7 +135,7 @@ class UserMemoryRepositoryPort(Protocol):
 class TrainingPlanProposalRepositoryPort(Protocol):
     """训练计划提案持久化端口。"""
 
-    def create(
+    async def create(
         self,
         user_id: str,
         plan: TrainingPlanDraft,
@@ -127,7 +150,7 @@ class TrainingPlanProposalRepositoryPort(Protocol):
         :return: 已创建的提案。
         """
 
-    def list_by_user(self, user_id: str) -> list[TrainingPlanProposalResponse]:
+    async def list_by_user(self, user_id: str) -> list[TrainingPlanProposalResponse]:
         """
         查询用户的提案列表。
 
@@ -135,7 +158,7 @@ class TrainingPlanProposalRepositoryPort(Protocol):
         :return: 用户提案列表。
         """
 
-    def get_by_id_for_user(
+    async def get_by_id_for_user(
         self,
         user_id: str,
         proposal_id: int,
@@ -148,7 +171,7 @@ class TrainingPlanProposalRepositoryPort(Protocol):
         :return: 提案；不存在或不属于该用户时返回 None。
         """
 
-    def approve(
+    async def approve(
         self,
         user_id: str,
         proposal_id: int,
@@ -165,7 +188,7 @@ class TrainingPlanProposalRepositoryPort(Protocol):
         :return: 更新后的提案；提案不存在时返回 None。
         """
 
-    def reject(
+    async def reject(
         self,
         user_id: str,
         proposal_id: int,
@@ -180,11 +203,58 @@ class TrainingPlanProposalRepositoryPort(Protocol):
         :return: 更新后的提案；提案不存在时返回 None。
         """
 
+    async def mark_approving(
+        self,
+        user_id: str,
+        proposal_id: int,
+    ) -> TrainingPlanProposalResponse | None:
+        """
+        将待决定 Proposal 原子更新为批准处理中。
+
+        :param user_id: 用户标识。
+        :param proposal_id: Proposal 标识。
+        :return: 更新后的 Proposal；当前状态不允许更新时返回 None。
+        """
+
+    async def create_revision(
+        self,
+        user_id: str,
+        parent_proposal_id: int,
+        plan: TrainingPlanDraft,
+        safety_check: SafetyCheckResult,
+    ) -> TrainingPlanProposalResponse | None:
+        """
+        根据待决定 Proposal 创建下一版修订。
+
+        :param user_id: 用户标识。
+        :param parent_proposal_id: 被修订的 Proposal 标识。
+        :param plan: 修订后的训练计划草案。
+        :param safety_check: 修订计划的确定性安全检查结果。
+        :return: 新版本 Proposal；原 Proposal 不可修订时返回 None。
+        """
+
+    async def create_replacement(
+        self,
+        user_id: str,
+        base_plan_id: int,
+        plan: TrainingPlanDraft,
+        safety_check: SafetyCheckResult,
+    ) -> TrainingPlanProposalResponse | None:
+        """
+        基于用户已有正式计划创建替换 Proposal。
+
+        :param user_id: 用户标识。
+        :param base_plan_id: 被替换的正式计划标识。
+        :param plan: 替换后的训练计划草案。
+        :param safety_check: 替换计划的确定性安全检查结果。
+        :return: 替换 Proposal；基础计划不匹配时返回 None。
+        """
+
 
 class WorkoutSessionRepositoryPort(Protocol):
     """训练记录持久化端口。"""
 
-    def save(
+    async def save(
         self,
         user_id: str,
         plan_id: int,
@@ -203,7 +273,7 @@ class WorkoutSessionRepositoryPort(Protocol):
         :return: 已保存的训练记录。
         """
 
-    def list_by_user(
+    async def list_by_user(
         self,
         user_id: str,
         plan_id: int | None = None,
@@ -214,4 +284,18 @@ class WorkoutSessionRepositoryPort(Protocol):
         :param user_id: 用户标识。
         :param plan_id: 可选的训练计划筛选条件。
         :return: 用户训练记录列表。
+        """
+    async def list_by_user_in_period(
+        self,
+        user_id: str,
+        start_at: datetime,
+        end_at: datetime,
+    ) -> list[WorkoutSessionResponse]:
+        """
+        查询指定用户在时间区间内创建的训练记录。
+
+        :param user_id: 用户标识。
+        :param start_at: 包含在查询范围内的起始时间。
+        :param end_at: 不包含在查询范围内的结束时间。
+        :return: 时间区间内的训练记录列表。
         """

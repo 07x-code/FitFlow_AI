@@ -123,7 +123,7 @@ class CoachToolGraphBuilder:
             return "force_final_answer"
         return "execute_tools"
 
-    def _execute_tools(
+    async def _execute_tools(
         self,
         state: CoachToolAgentState,
     ) -> CoachToolAgentState:
@@ -143,7 +143,7 @@ class CoachToolGraphBuilder:
         referenced_plan_id = state.get("referenced_plan_id")
 
         for call in state.get("pending_tool_calls", ()):
-            execution = self.tool_executor.execute(call, runtime)
+            execution = await self.tool_executor.execute(call, runtime)
             executions.append(execution)
             knowledge_items.extend(execution.knowledge_items)
             if execution.referenced_plan_id is not None:

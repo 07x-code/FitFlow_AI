@@ -2,6 +2,7 @@ import asyncio
 from datetime import date
 
 import pytest
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
 from app.core.config import AppSettings
@@ -20,7 +21,7 @@ DATABASE_URL = AppSettings.from_env().test_database_url
 
 async def _assert_current_plan_is_unique_per_user_and_week() -> None:
     """
-    验证同一用户同一自然周只能存在一个当前正式计划。
+    验证当前计划唯一约束及事务回滚后的 Session 可用性。
 
     :return: 无返回值。
     """
@@ -86,6 +87,13 @@ async def _assert_current_plan_is_unique_per_user_and_week() -> None:
                 await session.flush()
 
             await session.rollback()
+            saved_plan_count = await session.scalar(
+                select(func.count())
+                .select_from(TrainingPlanRecord)
+                .where(TrainingPlanRecord.user_id == user_id)
+            )
+
+            assert saved_plan_count == 0
     finally:
         await engine.dispose()
 

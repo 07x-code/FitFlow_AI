@@ -1,9 +1,20 @@
 from uuid import uuid4
+from collections.abc import Iterator
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
 
+@pytest.fixture
+def client() -> Iterator[TestClient]:
+    """
+    创建已运行 FastAPI 生命周期的测试客户端。
+
+    :return: 已连接测试数据库的客户端。
+    """
+    with TestClient(app) as test_client:
+        yield test_client
 
 def save_profile(client: TestClient, user_id: str) -> None:
     """
@@ -30,8 +41,7 @@ def save_profile(client: TestClient, user_id: str) -> None:
     assert response.status_code == 201
 
 
-def test_coach_records_messages_and_tool_observations_per_session():
-    client = TestClient(app)
+def test_coach_records_messages_and_tool_observations_per_session(client: TestClient):
     user_id = f"working-memory-user-{uuid4().hex}"
     other_user_id = f"working-memory-other-{uuid4().hex}"
     session_id = f"session-{uuid4().hex}"
@@ -84,8 +94,7 @@ def test_coach_records_messages_and_tool_observations_per_session():
     }
 
 
-def test_end_session_immediately_clears_working_memory():
-    client = TestClient(app)
+def test_end_session_immediately_clears_working_memory(client: TestClient):
     user_id = f"working-memory-clear-{uuid4().hex}"
     session_id = f"session-{uuid4().hex}"
     save_profile(client, user_id)
@@ -113,8 +122,8 @@ def test_end_session_immediately_clears_working_memory():
     assert list_response.json()["items"] == []
 
 
-def test_coach_requires_session_id_header():
-    response = TestClient(app).post(
+def test_coach_requires_session_id_header(client: TestClient):
+    response = client.post(
         "/api/coach/chat",
         headers={"X-User-ID": "missing-session-user"},
         json={"message": "hello"},

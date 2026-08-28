@@ -83,7 +83,7 @@
 ### 验收
 
 - 新数据库可以只靠 Alembic 从零建表。
-- PostgreSQL 业务表只由 Alembic 创建；旧 SQLite Repository 的运行时建表逻辑暂时保留，并在 4.8 删除。
+- PostgreSQL 业务表只由 Alembic 创建，运行时代码不执行自建表逻辑。
 - 迁移可以回退并重新执行。
 - Schema 中不存在 SQLite 专用语法。
 
@@ -93,18 +93,18 @@
 
 逐个替换 SQLite Repository，并把相关 Port、Use Case 和 API 调整为异步调用。
 
-> 执行顺序调整（2026-08-19）：4.1 和 4.2 已完成。由于 `training_plans` 要求目标周、版本、状态和必填的 `source_proposal_id`，而当前领域模型尚未提供这些数据，4.3 至 4.8 暂停。先完成第 6 步的训练计划与 Proposal 领域模型升级，再从 4.3 恢复 Repository 迁移。
+> 完成记录（2026-08-28）：核心 Repository、Port、Use Case、FastAPI 路由、Planner 和 Coach 已完成 PostgreSQL Async 迁移；请求通过统一异步 Session 提交或回滚，SQLite Adapter 和相关测试夹具已移除。
 
 ### 小检查点
 
 - [x] 4.1 先迁移 `ProfileRepository`，完成保存、查询和用户隔离测试。
 - [x] 4.2 迁移 `UserMemoryRepository`。
-- [ ] 4.3 迁移 `TrainingPlanRepository`。
-- [ ] 4.4 迁移 `TrainingPlanProposalRepository`。
-- [ ] 4.5 迁移 `WorkoutSessionRepository` 和周报查询。
-- [ ] 4.6 将 Repository Port、Use Case 和 FastAPI 路由改成 `async`。
-- [ ] 4.7 更新依赖注入，让同一请求可以共享数据库 Session。
-- [ ] 4.8 删除 SQLite Adapter、配置和测试夹具。
+- [x] 4.3 迁移 `TrainingPlanRepository`。
+- [x] 4.4 迁移 `TrainingPlanProposalRepository`。
+- [x] 4.5 迁移 `WorkoutSessionRepository` 和周报查询。
+- [x] 4.6 将 Repository Port、Use Case 和 FastAPI 路由改成 `async`。
+- [x] 4.7 更新依赖注入，让同一请求可以共享数据库 Session。
+- [x] 4.8 删除 SQLite Adapter、配置和测试夹具。
 
 ### 验收
 
@@ -112,6 +112,8 @@
 - 每个测试结束后数据被回滚或清理。
 - 运行代码只存在 PostgreSQL Repository 实现。
 - 项目不再需要 `fitflow.db`。
+
+验收结果（2026-08-28）：全量测试 `153 passed`。
 
 ## 第 5 步：完成长期记忆与短期记忆分工
 

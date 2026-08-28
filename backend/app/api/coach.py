@@ -11,7 +11,7 @@ router = APIRouter(prefix="/api/coach", tags=["coach"])
 
 
 @router.post("/chat", response_model=CoachChatResponse)
-def chat_with_coach(
+async def chat_with_coach(
     request: CoachChatRequest,
     user_id: Annotated[str, Header(alias="X-User-ID")],
     session_id: Annotated[
@@ -29,4 +29,4 @@ def chat_with_coach(
     :param use_cases: AI 教练应用用例。
     :return: AI 教练回复。
     """
-    return use_cases.chat(user_id, session_id, request)
+    return await use_cases.chat(user_id, session_id, request)

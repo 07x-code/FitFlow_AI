@@ -1,12 +1,24 @@
 from uuid import uuid4
+from collections.abc import Iterator
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
 
+@pytest.fixture
+def client() -> Iterator[TestClient]:
+    """
+    创建已运行 FastAPI 生命周期的测试客户端。
 
-def test_coach_reuses_only_same_session_working_context():
-    client = TestClient(app)
+    :return: 已连接测试数据库的客户端。
+    """
+    with TestClient(app) as test_client:
+        yield test_client
+
+def test_coach_reuses_only_same_session_working_context(
+    client: TestClient,
+) -> None:
     user_id = f"working-context-user-{uuid4().hex}"
     session_id = f"working-context-session-{uuid4().hex}"
     first_message = "这一轮只讨论哑铃训练。"

@@ -1,9 +1,21 @@
 from uuid import uuid4
+from collections.abc import Iterator
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
 
+
+@pytest.fixture
+def client() -> Iterator[TestClient]:
+    """
+    创建已启动应用生命周期的测试客户端。
+
+    :return: 可用于调用 API 的测试客户端。
+    """
+    with TestClient(app) as test_client:
+        yield test_client
 
 def unique_user_id(prefix: str) -> str:
     return f"{prefix}-{uuid4().hex}"
@@ -27,8 +39,7 @@ def save_profile(client: TestClient, user_id: str) -> None:
     assert response.status_code == 201
 
 
-def test_create_and_list_user_memories():
-    client = TestClient(app)
+def test_create_and_list_user_memories(client: TestClient):
     user_id = unique_user_id("memory-user")
 
     response = client.post(
@@ -54,8 +65,7 @@ def test_create_and_list_user_memories():
     assert list_response.json()["memories"][0]["id"] == body["id"]
 
 
-def test_delete_memory_removes_only_owned_memory():
-    client = TestClient(app)
+def test_delete_memory_removes_only_owned_memory(client: TestClient):
     owner_user_id = unique_user_id("memory-owner")
     other_user_id = unique_user_id("memory-other")
     create_response = client.post(
@@ -84,8 +94,7 @@ def test_delete_memory_removes_only_owned_memory():
     assert list_response.json() == {"memories": []}
 
 
-def test_coach_chat_includes_user_memories_in_prompt():
-    client = TestClient(app)
+def test_coach_chat_includes_user_memories_in_prompt(client: TestClient):
     user_id = unique_user_id("memory-chat-user")
     save_profile(client, user_id)
     memory_content = "I prefer dumbbells for upper body workouts."

@@ -151,8 +151,8 @@ class GetLatestTrainingPlanTool(
         )
         self.repository = repository
 
-    def run(self, tool_input: str) -> TrainingPlanHistoryItem | None:
-        plans = self.repository.list_by_user(tool_input)
+    async def run(self, tool_input: str) -> TrainingPlanHistoryItem | None:
+        plans = await self.repository.list_by_user(tool_input)
         return plans[0] if plans else None
 
 

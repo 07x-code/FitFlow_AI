@@ -20,7 +20,7 @@ class TrainingPlanAgentResultPort(Protocol):
 class TrainingPlanAgentPort(Protocol):
     """训练计划 Agent 对应用层暴露的端口。"""
 
-    def run(
+    async def run(
         self,
         agent_input: str,
         **kwargs: object,
@@ -37,7 +37,7 @@ class TrainingPlanAgentPort(Protocol):
 class CoachAgentPort(Protocol):
     """AI 教练对应用层暴露的端口。"""
 
-    def chat(
+    async def chat(
         self,
         user_id: str,
         session_id: str,

@@ -89,7 +89,7 @@ class CoachAgent(Agent[CoachAgentInput, CoachChatResponse | None]):
             max_tool_iterations=max_tool_iterations,
         )
 
-    def run(
+    async def run(
         self,
         agent_input: CoachAgentInput,
         **kwargs: object,
@@ -116,7 +116,7 @@ class CoachAgent(Agent[CoachAgentInput, CoachChatResponse | None]):
 
         profile = cast(
             FitnessProfileCreate | None,
-            self.tool_registry.execute(
+            await self.tool_registry.execute_async(
                 GET_PROFILE_TOOL,
                 agent_input.user_id,
             ),
@@ -165,7 +165,7 @@ class CoachAgent(Agent[CoachAgentInput, CoachChatResponse | None]):
         )
         graph_result = cast(
             CoachToolAgentState,
-            self.graph.invoke(
+            await self.graph.ainvoke(
                 {
                     "messages": initial_messages,
                     "user_id": agent_input.user_id,
@@ -206,7 +206,7 @@ class CoachAgent(Agent[CoachAgentInput, CoachChatResponse | None]):
         )
         return response
 
-    def chat(
+    async def chat(
         self,
         user_id: str,
         session_id: str,
@@ -220,7 +220,7 @@ class CoachAgent(Agent[CoachAgentInput, CoachChatResponse | None]):
         :param request: 用户提交的教练对话请求。
         :return: 教练回复；用户画像不存在时返回 None。
         """
-        return self.run(
+        return await self.run(
             CoachAgentInput(
                 user_id=user_id,
                 session_id=session_id,

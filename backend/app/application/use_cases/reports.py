@@ -1,5 +1,8 @@
 from dataclasses import dataclass
+from datetime import datetime, time, timedelta
+from zoneinfo import ZoneInfo
 
+from app.application.errors import ConflictError
 from app.domain.models import (
     SafetyCheckResult,
     TrainingPlanDraft,
@@ -13,6 +16,8 @@ from app.ports.repositories import (
     TrainingPlanRepositoryPort,
     WorkoutSessionRepositoryPort,
 )
+REPORT_TIMEZONE = ZoneInfo("Asia/Shanghai")
+
 
 
 @dataclass(frozen=True)
@@ -23,40 +28,57 @@ class ReportUseCases:
     sessions: WorkoutSessionRepositoryPort
     proposals: TrainingPlanProposalRepositoryPort
 
-    def create_weekly(self, user_id: str) -> WeeklyReportResponse:
+    async def create_weekly(
+        self,
+        user_id: str,
+    ) -> WeeklyReportResponse:
         """
-        根据用户训练记录生成周报和可选调整提案。
+        根据用户当前自然周的训练记录生成周报和可选调整 Proposal。
 
         :param user_id: 用户标识。
         :return: 训练周报。
         """
-        sessions = self.sessions.list_by_user(user_id)
+        start_at, end_at = _current_week_period()
+        sessions = await self.sessions.list_by_user_in_period(
+            user_id,
+            start_at,
+            end_at,
+        )
         metrics = self._build_weekly_metrics(sessions)
 
-        if self._needs_lower_intensity(metrics):
-            plans = self.plans.list_by_user(user_id)
-            if plans:
-                adjusted_plan = self._lower_plan_intensity(plans[0].plan)
-                safety_check = SafetyCheckResult.model_validate(
-                    validate_beginner_plan(adjusted_plan)
-                )
-                proposal = self.proposals.create(
-                    user_id=user_id,
-                    plan=adjusted_plan,
-                    safety_check=safety_check,
-                )
-                return WeeklyReportResponse(
-                    metrics=metrics,
-                    recommendation=(
-                        "本周疼痛或疲劳偏高，建议生成一个降低强度的训练计划草案，等待你确认。"
-                    ),
-                    adjustment_proposal=proposal,
-                )
+        if not self._needs_lower_intensity(metrics):
+            return WeeklyReportResponse(
+                metrics=metrics,
+                recommendation="本周反馈整体稳定，暂时保持当前训练计划。",
+                adjustment_proposal=None,
+            )
+
+        base_plan = await self.plans.get_by_id_for_user(
+            user_id,
+            sessions[0].plan_id,
+        )
+        if base_plan is None:
+            raise ConflictError("当前周训练记录关联的训练计划不存在。")
+
+        adjusted_plan = self._lower_plan_intensity(base_plan.plan)
+        safety_check = SafetyCheckResult.model_validate(
+            validate_beginner_plan(adjusted_plan)
+        )
+        proposal = await self.proposals.create_replacement(
+            user_id=user_id,
+            base_plan_id=base_plan.id,
+            plan=adjusted_plan,
+            safety_check=safety_check,
+        )
+        if proposal is None:
+            raise ConflictError("无法为当前训练计划创建调整 Proposal。")
 
         return WeeklyReportResponse(
             metrics=metrics,
-            recommendation="本周反馈整体稳定，暂时保持当前训练计划。",
-            adjustment_proposal=None,
+            recommendation=(
+                "本周疼痛或疲劳偏高，建议生成一个降低强度的训练计划草案，等待你确认。"
+            ),
+            adjustment_proposal=proposal,
         )
 
     @staticmethod
@@ -119,3 +141,19 @@ def _round_ratio(numerator: int, denominator: int) -> float:
     if denominator == 0:
         return 0.0
     return round(numerator / denominator, 2)
+
+
+def _current_week_period() -> tuple[datetime, datetime]:
+    """
+    计算 Asia/Shanghai 时区下当前自然周的查询区间。
+
+    :return: 本周一零点到下周一零点的左闭右开时间区间。
+    """
+    now = datetime.now(REPORT_TIMEZONE)
+    monday = now.date() - timedelta(days=now.weekday())
+    start_at = datetime.combine(
+        monday,
+        time.min,
+        tzinfo=REPORT_TIMEZONE,
+    )
+    return start_at, start_at + timedelta(days=7)

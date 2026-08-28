@@ -109,7 +109,7 @@ class CoachReadOnlyToolExecutor:
         """
         return self._definitions
 
-    def execute(
+    async def execute(
         self,
         call: LLMToolCall,
         runtime: CoachToolRuntime,
@@ -124,15 +124,15 @@ class CoachReadOnlyToolExecutor:
         try:
             if call.name == GET_LATEST_TRAINING_PLAN_TOOL:
                 EmptyToolArguments.model_validate(call.arguments)
-                return self._get_latest_plan(runtime)
+                return await self._get_latest_plan(runtime)
             if call.name == RECALL_USER_MEMORY_TOOL:
                 EmptyToolArguments.model_validate(call.arguments)
-                return self._recall_memories(runtime)
+                return await self._recall_memories(runtime)
             if call.name == RETRIEVE_FITNESS_KNOWLEDGE_TOOL:
                 arguments = KnowledgeToolArguments.model_validate(
                     call.arguments
                 )
-                return self._retrieve_knowledge(arguments)
+                return await self._retrieve_knowledge(arguments)
         except ValidationError as exc:
             return _error_execution(
                 call.name,
@@ -153,7 +153,7 @@ class CoachReadOnlyToolExecutor:
             observation="模型请求了白名单之外的工具，后端已拒绝执行。",
         )
 
-    def _get_latest_plan(
+    async def _get_latest_plan(
         self,
         runtime: CoachToolRuntime,
     ) -> CoachToolExecution:
@@ -163,7 +163,7 @@ class CoachReadOnlyToolExecutor:
         :param runtime: 可信的工具运行上下文。
         :return: 最近训练计划的紧凑执行结果。
         """
-        plan = self.registry.execute(
+        plan = await self.registry.execute_async(
             GET_LATEST_TRAINING_PLAN_TOOL,
             runtime.user_id,
         )
@@ -195,7 +195,7 @@ class CoachReadOnlyToolExecutor:
             referenced_plan_id=latest_plan.id,
         )
 
-    def _recall_memories(
+    async def _recall_memories(
         self,
         runtime: CoachToolRuntime,
     ) -> CoachToolExecution:
@@ -205,7 +205,7 @@ class CoachReadOnlyToolExecutor:
         :param runtime: 可信的工具运行上下文。
         :return: 最多二十条长期记忆的紧凑执行结果。
         """
-        raw_memories = self.registry.execute(
+        raw_memories = await self.registry.execute_async(
             RECALL_USER_MEMORY_TOOL,
             runtime.user_id,
         )
@@ -232,7 +232,7 @@ class CoachReadOnlyToolExecutor:
             success=True,
         )
 
-    def _retrieve_knowledge(
+    async def _retrieve_knowledge(
         self,
         arguments: KnowledgeToolArguments,
     ) -> CoachToolExecution:
@@ -242,7 +242,7 @@ class CoachReadOnlyToolExecutor:
         :param arguments: 已通过 Pydantic 校验的检索参数。
         :return: 健身知识条目和来源信息。
         """
-        raw_items = self.registry.execute(
+        raw_items = await self.registry.execute_async(
             RETRIEVE_FITNESS_KNOWLEDGE_TOOL,
             KnowledgeQuery(
                 query=arguments.query,

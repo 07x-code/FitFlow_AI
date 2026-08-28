@@ -21,7 +21,7 @@ class WorkoutUseCases:
     plans: TrainingPlanRepositoryPort
     sessions: WorkoutSessionRepositoryPort
 
-    def create_session(
+    async def create_session(
         self,
         user_id: str,
         plan_id: int,
@@ -35,13 +35,13 @@ class WorkoutUseCases:
         :param session: 待保存的训练记录。
         :return: 已保存的训练记录。
         """
-        plan = self.plans.get_by_id_for_user(user_id, plan_id)
+        plan = await self.plans.get_by_id_for_user(user_id, plan_id)
         if plan is None:
             raise NotFoundError("Training plan not found.")
 
         plan_day = self._get_plan_day(plan.plan.days, session.plan_day_index)
         self._validate_logged_exercises(session, plan_day)
-        return self.sessions.save(
+        return await self.sessions.save(
             user_id=user_id,
             plan_id=plan_id,
             plan_day_name=plan_day.name,
@@ -49,7 +49,7 @@ class WorkoutUseCases:
             safety_alert=self._build_safety_alert(session),
         )
 
-    def list_history(
+    async def list_history(
         self,
         user_id: str,
         plan_id: int | None = None,
@@ -61,8 +61,12 @@ class WorkoutUseCases:
         :param plan_id: 可选的训练计划筛选条件。
         :return: 用户训练历史响应。
         """
+        sessions = await self.sessions.list_by_user(
+            user_id,
+            plan_id=plan_id,
+        )
         return WorkoutHistoryResponse(
-            sessions=self.sessions.list_by_user(user_id, plan_id=plan_id)
+            sessions=sessions
         )
 
     @staticmethod

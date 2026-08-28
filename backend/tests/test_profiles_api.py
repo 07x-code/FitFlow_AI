@@ -1,13 +1,26 @@
-from importlib import reload
 
+from collections.abc import Iterator
+
+import pytest
 from fastapi.testclient import TestClient
 
-from app.api import profiles as profiles_api
 from app.main import app
 
 
-def test_create_profile_returns_risk_and_nutrition_assessment():
-    response = TestClient(app).post(
+
+
+@pytest.fixture
+def client() -> Iterator[TestClient]:
+    """
+    创建已启动应用生命周期的测试客户端。
+
+    :return: 可用于调用 Profile API 的测试客户端。
+    """
+    with TestClient(app) as test_client:
+        yield test_client
+
+def test_create_profile_returns_risk_and_nutrition_assessment(client: TestClient):
+    response = client.post(
         "/api/profiles",
         headers={"X-User-ID": "demo-user"},
         json={
@@ -36,8 +49,8 @@ def test_create_profile_returns_risk_and_nutrition_assessment():
     }
 
 
-def test_create_profile_declares_response_model_in_openapi():
-    response = TestClient(app).get("/openapi.json")
+def test_create_profile_declares_response_model_in_openapi(client: TestClient):
+    response = client.get("/openapi.json")
 
     assert response.status_code == 200
     schema = response.json()
@@ -48,8 +61,7 @@ def test_create_profile_declares_response_model_in_openapi():
     assert response_schema == {"$ref": "#/components/schemas/ProfileAssessmentResponse"}
 
 
-def test_get_profile_returns_saved_profile_for_user():
-    client = TestClient(app)
+def test_get_profile_returns_saved_profile_for_user(client: TestClient):
     client.post(
         "/api/profiles",
         headers={"X-User-ID": "saved-user"},
@@ -73,25 +85,3 @@ def test_get_profile_returns_saved_profile_for_user():
     assert body["nutrition"]["protein_target_g"] == 112
 
 
-def test_get_profile_survives_profiles_module_reload():
-    client = TestClient(app)
-    client.post(
-        "/api/profiles",
-        headers={"X-User-ID": "sqlite-user"},
-        json={
-            "age": 22,
-            "sex": "male",
-            "height_cm": 175,
-            "weight_kg": 70,
-            "goal": "muscle_gain",
-            "sessions_per_week": 3,
-            "session_minutes": 60,
-            "health_flags": [],
-        },
-    )
-
-    reload(profiles_api)   #重新加载模块，验证SQLite
-    response = client.get("/api/profiles/me", headers={"X-User-ID": "sqlite-user"})
-
-    assert response.status_code == 200
-    assert response.json()["profile"]["goal"] == "muscle_gain"

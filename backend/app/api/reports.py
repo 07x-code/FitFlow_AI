@@ -11,8 +11,8 @@ router = APIRouter(prefix="/api/reports", tags=["reports"])
 
 
 @router.post("/weekly", response_model=WeeklyReportResponse)
-def create_weekly_report(
+async def create_weekly_report(
     user_id: Annotated[str, Header(alias="X-User-ID")],
     use_cases: Annotated[ReportUseCases, Depends(get_report_use_cases)],
 ) -> WeeklyReportResponse:
-    return use_cases.create_weekly(user_id)
+    return await use_cases.create_weekly(user_id)

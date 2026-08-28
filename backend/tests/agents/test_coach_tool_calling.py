@@ -1,3 +1,5 @@
+import asyncio
+from unittest.mock import AsyncMock
 from app.ai.agents.single.coach import create_coach_agent
 from app.ai.orchestration.coach_tool_graph import create_coach_tool_graph
 from app.ai.tools.coach import (
@@ -14,15 +16,7 @@ from app.domain.models import CoachChatRequest, FitnessProfileCreate
 from app.infrastructure.knowledge.retriever import KnowledgeRetriever
 from app.infrastructure.llm.provider import FakeLLMProvider
 from app.infrastructure.memory.in_memory import InMemoryWorkingMemoryStore
-from app.infrastructure.persistence.sqlite.profile_repository import (
-    ProfileRepository,
-)
-from app.infrastructure.persistence.sqlite.training_plan_repository import (
-    TrainingPlanRepository,
-)
-from app.infrastructure.persistence.sqlite.user_memory_repository import (
-    UserMemoryRepository,
-)
+
 from app.ports.llm import (
     LLMCompletion,
     LLMMessage,
@@ -71,21 +65,25 @@ def test_runtime_user_id_is_injected_and_model_cannot_override_it():
         session_id="trusted-session",
     )
 
-    valid_result = executor.execute(
-        LLMToolCall(
-            id="valid-call",
-            name=GET_LATEST_TRAINING_PLAN_TOOL,
-            arguments={},
-        ),
-        runtime,
+    valid_result = asyncio.run(
+        executor.execute(
+            LLMToolCall(
+                id="valid-call",
+                name=GET_LATEST_TRAINING_PLAN_TOOL,
+                arguments={},
+            ),
+            runtime,
+            )
     )
-    rejected_result = executor.execute(
-        LLMToolCall(
-            id="malicious-call",
-            name=GET_LATEST_TRAINING_PLAN_TOOL,
-            arguments={"user_id": "other-user"},
-        ),
-        runtime,
+    rejected_result = asyncio.run(
+        executor.execute(
+            LLMToolCall(
+                id="malicious-call",
+                name=GET_LATEST_TRAINING_PLAN_TOOL,
+                arguments={"user_id": "other-user"},
+            ),
+            runtime,
+        )
     )
 
     assert valid_result.success is True
@@ -93,45 +91,49 @@ def test_runtime_user_id_is_injected_and_model_cannot_override_it():
     assert captured_user_ids == ["trusted-user"]
 
 
-def test_simple_greeting_does_not_prefetch_optional_context(tmp_path):
+def test_simple_greeting_does_not_prefetch_optional_context() -> None:
     """
-    验证普通问候不会预先读取可选业务数据。
+    验证普通问候只读取画像，不预先读取可选业务数据。
 
-    :param tmp_path: Pytest 提供的临时目录。
     :return: 无返回值。
     """
-    db_path = tmp_path / "fitflow.db"
-    profiles = ProfileRepository(db_path)
+    profiles = AsyncMock()
+    plans = AsyncMock()
+    memories = AsyncMock()
     working_memory = InMemoryWorkingMemoryStore()
-    profiles.save(
-        "greeting-user",
-        FitnessProfileCreate(
-            age=22,
-            sex="male",
-            height_cm=175,
-            weight_kg=70,
-            goal="muscle_gain",
-            sessions_per_week=3,
-            session_minutes=60,
-            health_flags=[],
-        ),
+    profiles.get.return_value = FitnessProfileCreate(
+        age=22,
+        sex="male",
+        height_cm=175,
+        weight_kg=70,
+        goal="muscle_gain",
+        sessions_per_week=3,
+        session_minutes=60,
+        health_flags=[],
     )
+
     agent = create_coach_agent(
         profile_repository=profiles,
-        training_plan_repository=TrainingPlanRepository(db_path),
-        memory_repository=UserMemoryRepository(db_path),
+        training_plan_repository=plans,
+        memory_repository=memories,
         knowledge_retriever=KnowledgeRetriever.from_default_file(),
         llm_provider=FakeLLMProvider(),
         working_memory=working_memory,
     )
 
-    response = agent.chat(
-        "greeting-user",
-        "greeting-session",
-        CoachChatRequest(message="你好"),
+    response = asyncio.run(
+        agent.chat(
+            "greeting-user",
+            "greeting-session",
+            CoachChatRequest(message="你好"),
+        )
     )
 
     assert response is not None
+    profiles.get.assert_awaited_once_with("greeting-user")
+    plans.list_by_user.assert_not_awaited()
+    memories.list_by_user.assert_not_awaited()
+
     observations = {
         item.tool_name
         for item in working_memory.list(
@@ -219,17 +221,19 @@ def test_graph_stops_repeated_tool_calls_at_configured_limit():
         max_tool_iterations=2,
     )
 
-    result = graph.invoke(
-        {
-            "messages": [LLMMessage(role="user", content="重复调用测试")],
-            "user_id": "limit-user",
-            "session_id": "limit-session",
-            "tool_iterations": 0,
-            "pending_tool_calls": (),
-            "tool_executions": [],
-            "knowledge_items": [],
-            "referenced_plan_id": None,
-        }
+    result = asyncio.run(
+        graph.ainvoke(
+            {
+                "messages": [LLMMessage(role="user", content="重复调用测试")],
+                "user_id": "limit-user",
+                "session_id": "limit-session",
+                "tool_iterations": 0,
+                "pending_tool_calls": (),
+                "tool_executions": [],
+                "knowledge_items": [],
+                "referenced_plan_id": None,
+            }
+        )
     )
 
     assert result["tool_iterations"] == 2

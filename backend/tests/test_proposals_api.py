@@ -1,8 +1,21 @@
 from uuid import uuid4
+from collections.abc import Iterator
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
+
+
+@pytest.fixture
+def client() -> Iterator[TestClient]:
+    """
+    创建已启动应用生命周期的测试客户端。
+
+    :return: 可用于调用 Proposal API 的测试客户端。
+    """
+    with TestClient(app) as test_client:
+        yield test_client
 
 
 def unique_user_id(prefix: str) -> str:
@@ -50,13 +63,12 @@ def get_history(client: TestClient, user_id: str) -> dict:
     return response.json()
 
 
-def test_create_training_plan_proposal_does_not_save_history():
+def test_create_training_plan_proposal_does_not_save_history(client: TestClient):
     """
     验证初始训练计划 Proposal 包含目标周和修订元数据。
 
     :return: 无返回值。
     """
-    client = TestClient(app)
     user_id = unique_user_id("proposal-user")
     save_profile(client, user_id)
 
@@ -84,8 +96,7 @@ def test_create_training_plan_proposal_does_not_save_history():
     assert proposals_response.json()["proposals"][0]["id"] == body["id"]
 
 
-def test_approve_training_plan_proposal_saves_plan_to_history():
-    client = TestClient(app)
+def test_approve_training_plan_proposal_saves_plan_to_history(client: TestClient):
     user_id = unique_user_id("approve-proposal-user")
     save_profile(client, user_id)
     proposal = create_proposal(client, user_id)
@@ -111,8 +122,7 @@ def test_approve_training_plan_proposal_saves_plan_to_history():
     assert history["plans"][0]["plan"] == proposal["plan"]
 
 
-def test_reject_training_plan_proposal_does_not_save_history():
-    client = TestClient(app)
+def test_reject_training_plan_proposal_does_not_save_history(client: TestClient):
     user_id = unique_user_id("reject-proposal-user")
     save_profile(client, user_id)
     proposal = create_proposal(client, user_id)
@@ -135,8 +145,7 @@ def test_reject_training_plan_proposal_does_not_save_history():
     assert get_history(client, user_id) == {"plans": []}
 
 
-def test_training_plan_proposal_blocks_risky_profile():
-    client = TestClient(app)
+def test_training_plan_proposal_blocks_risky_profile(client: TestClient):
     user_id = unique_user_id("risky-proposal-user")
     save_profile(client, user_id, health_flags=["acute_injury"])
 
@@ -156,8 +165,7 @@ def test_training_plan_proposal_blocks_risky_profile():
     assert get_history(client, user_id) == {"plans": []}
 
 
-def test_proposal_decision_hides_other_users_proposal():
-    client = TestClient(app)
+def test_proposal_decision_hides_other_users_proposal(client: TestClient):
     owner_user_id = unique_user_id("proposal-owner")
     other_user_id = unique_user_id("proposal-other")
     save_profile(client, owner_user_id)
@@ -176,8 +184,7 @@ def test_proposal_decision_hides_other_users_proposal():
     assert get_history(client, other_user_id) == {"plans": []}
 
 
-def test_proposal_decision_rejects_already_decided_proposal():
-    client = TestClient(app)
+def test_proposal_decision_rejects_already_decided_proposal(client: TestClient):
     user_id = unique_user_id("double-decision-proposal-user")
     save_profile(client, user_id)
     proposal = create_proposal(client, user_id)
