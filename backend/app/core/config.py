@@ -58,6 +58,9 @@ class AppSettings:
     openai_api_key: str | None
     dashscope_model: str
     dashscope_base_url: str
+    siliconflow_api_key: str | None = None
+    siliconflow_model: str = "Qwen/Qwen3.5-4B"
+    siliconflow_base_url: str = "https://api.siliconflow.cn/v1"
     database_url: str = DEFAULT_DATABASE_URL
     test_database_url: str = DEFAULT_TEST_DATABASE_URL
     working_memory_backend: str = "memory"
@@ -97,6 +100,15 @@ class AppSettings:
                 "DASHSCOPE_BASE_URL",
                 default="https://dashscope.aliyuncs.com/compatible-mode/v1",
             ),
+            siliconflow_api_key=_read_env("SILICONFLOW_API_KEY"),
+            siliconflow_model=_read_env(
+                "SILICONFLOW_MODEL",
+                default="Qwen/Qwen3.5-4B",
+            ),
+            siliconflow_base_url=_read_env(
+                "SILICONFLOW_BASE_URL",
+                default="https://api.siliconflow.cn/v1",
+            ),
             database_url=database_url,
             test_database_url=test_database_url,
             working_memory_backend=_read_env(
@@ -134,6 +146,15 @@ class AppSettings:
         :return: 已配置时返回 True，否则返回 False。
         """
         return bool(self.openai_api_key)
+
+    @property
+    def has_siliconflow_api_key(self) -> bool:
+        """
+        判断是否已配置 SiliconFlow API Key。
+
+        :return: 已配置时返回 True，否则返回 False。
+        """
+        return bool(self.siliconflow_api_key)
 
 
 def _read_env(name: str, default: str | None = None) -> str | None:

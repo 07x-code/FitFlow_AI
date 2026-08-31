@@ -29,6 +29,28 @@ def test_settings_reads_selected_llm_provider(monkeypatch):
     assert settings.llm_provider == "dashscope"
 
 
+def test_settings_reads_siliconflow_environment_variables(monkeypatch):
+    """
+    验证应用配置能够读取硅基流动模型参数。
+
+    :param monkeypatch: Pytest 提供的环境变量替换工具。
+    :return: 无返回值。
+    """
+    monkeypatch.setenv("SILICONFLOW_API_KEY", "siliconflow-test-key")
+    monkeypatch.setenv("SILICONFLOW_MODEL", "Qwen/Qwen3.5-4B")
+    monkeypatch.setenv(
+        "SILICONFLOW_BASE_URL",
+        "https://siliconflow.example/v1",
+    )
+
+    settings = AppSettings.from_env()
+
+    assert settings.siliconflow_api_key == "siliconflow-test-key"
+    assert settings.siliconflow_model == "Qwen/Qwen3.5-4B"
+    assert settings.siliconflow_base_url == "https://siliconflow.example/v1"
+    assert settings.has_siliconflow_api_key is True
+
+
 def test_settings_uses_dashscope_defaults(monkeypatch):
     monkeypatch.delenv("DASHSCOPE_MODEL", raising=False)
     monkeypatch.delenv("DASHSCOPE_BASE_URL", raising=False)

@@ -67,6 +67,12 @@ class ProposalDecisionRequest(BaseModel):
     decision_note: str | None = Field(default=None, max_length=500)
 
 
+class ProposalRevisionRequest(BaseModel):
+    """用户提交的训练计划修改意见。"""
+
+    feedback: str = Field(min_length=2, max_length=500)
+
+
 class TrainingPlanProposalResponse(BaseModel):
     """训练计划提案响应。"""
 

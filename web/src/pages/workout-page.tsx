@@ -173,10 +173,9 @@ export function WorkoutPage() {
       <Button
         disabled={completedCount === 0}
         fullWidth
-        onClick={() => navigate('/app/progress')}>
+        onClick={() => navigate('/app')}>
         完成训练 · {completedCount}/{sets.length} 组
       </Button>
     </div>
   );
 }
-

@@ -1,5 +1,5 @@
 import {
-  BarChart3,
+  Activity,
   Bot,
   Dumbbell,
   Home,
@@ -17,7 +17,7 @@ const navigation = [
   { to: '/app', label: '首页', icon: Home, end: true },
   { to: '/app/plans', label: '计划', icon: Dumbbell, end: false },
   { to: '/app/coach', label: 'AI 教练', icon: Bot, end: false },
-  { to: '/app/progress', label: '进度', icon: BarChart3, end: false },
+  { to: '/app/exercises', label: '动作', icon: Activity, end: false },
   { to: '/app/profile', label: '我的', icon: UserRound, end: false },
 ] as const;
 
@@ -35,7 +35,7 @@ export function AppShell() {
             </span>
             <span>
               <strong>FitFlow</strong>
-              <small>AI COACH</small>
+              <small>智能教练</small>
             </span>
           </NavLink>
           <button
@@ -124,4 +124,3 @@ export function AppShell() {
     </div>
   );
 }
-

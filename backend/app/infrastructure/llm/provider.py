@@ -266,16 +266,42 @@ class DashScopeLLMProvider:
         except error.HTTPError as exc:
             message = exc.read().decode("utf-8", errors="replace")
             raise RuntimeError(
-                f"DashScope request failed with HTTP {exc.code}: {message}"
+                f"{self.name} request failed with HTTP {exc.code}: {message}"
             ) from exc
-        except error.URLError as exc:
+        except (error.URLError, TimeoutError) as exc:
             raise RuntimeError(
-                f"DashScope request failed: {exc.reason}"
+                f"{self.name} request failed: {exc}"
             ) from exc
 
         if not isinstance(response_body, dict):
-            raise RuntimeError("DashScope response was not a JSON object.")
+            raise RuntimeError(
+                f"{self.name} response was not a JSON object."
+            )
         return response_body
+
+
+@dataclass(frozen=True)
+class SiliconFlowLLMProvider(DashScopeLLMProvider):
+    """通过 OpenAI 兼容接口调用硅基流动模型。"""
+
+    name: str = "siliconflow"
+
+    def _post_chat_completion(
+        self,
+        payload: dict[str, object],
+    ) -> dict:
+        """
+        使用非思考模式调用硅基流动，缩短交互式请求耗时。
+
+        :param payload: 已序列化的聊天补全请求体。
+        :return: 解析后的 JSON 响应对象。
+        """
+        return super()._post_chat_completion(
+            {
+                **payload,
+                "enable_thinking": False,
+            }
+        )
 
 
 def _select_fake_tools(
@@ -459,6 +485,19 @@ def create_llm_provider(
             base_url=settings.dashscope_base_url,
         )
 
+    if settings.llm_provider == "siliconflow":
+        if not settings.has_siliconflow_api_key:
+            raise ValueError(
+                "SILICONFLOW_API_KEY is required when "
+                "FITFLOW_LLM_PROVIDER=siliconflow."
+            )
+        return SiliconFlowLLMProvider(
+            api_key=settings.siliconflow_api_key,
+            model=settings.siliconflow_model,
+            base_url=settings.siliconflow_base_url,
+            timeout_seconds=60,
+        )
+
     if settings.llm_provider == "openai":
         if not settings.has_openai_api_key:
             raise ValueError(
@@ -471,5 +510,6 @@ def create_llm_provider(
         )
 
     raise ValueError(
-        "FITFLOW_LLM_PROVIDER must be one of: fake, dashscope, openai."
+        "FITFLOW_LLM_PROVIDER must be one of: "
+        "fake, dashscope, siliconflow, openai."
     )

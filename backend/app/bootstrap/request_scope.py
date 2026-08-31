@@ -43,17 +43,20 @@ def create_profile_use_cases(
 
 def create_proposal_use_cases(
     session: AsyncSession,
+    shared: ApplicationContainer,
 ) -> ProposalUseCases:
     """
     创建请求级 Proposal 用例。
 
     :param session: 当前请求共享的数据库 Session。
+    :param shared: 应用共享组件容器。
     :return: Proposal 应用用例。
     """
     return ProposalUseCases(
         profiles=ProfileRepository(session),
         proposals=TrainingPlanProposalRepository(session),
         plans=TrainingPlanRepository(session),
+        llm=shared.llm_provider,
     )
 
 

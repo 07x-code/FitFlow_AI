@@ -25,6 +25,7 @@ class ProfileRepositoryPort(Protocol):
         :param profile: 已校验的健身画像。
         :return: 无返回值。
         """
+        ...
 
     async def get(self, user_id: str) -> FitnessProfileCreate | None:
         """
@@ -33,6 +34,7 @@ class ProfileRepositoryPort(Protocol):
         :param user_id: 用户标识。
         :return: 用户健身画像；不存在时返回 None。
         """
+        ...
 
 
 class TrainingPlanRepositoryPort(Protocol):
@@ -57,6 +59,7 @@ class TrainingPlanRepositoryPort(Protocol):
         :param version: 同一用户同一周的计划版本。
         :return: 已保存的正式训练计划。
         """
+        ...
 
     async def list_by_user(
         self,
@@ -68,6 +71,7 @@ class TrainingPlanRepositoryPort(Protocol):
         :param user_id: 用户标识。
         :return: 按时间倒序排列的正式训练计划列表。
         """
+        ...
 
     async def get_by_id_for_user(
         self,
@@ -81,6 +85,7 @@ class TrainingPlanRepositoryPort(Protocol):
         :param plan_id: 正式训练计划标识。
         :return: 正式训练计划；不存在或不属于该用户时返回 None。
         """
+        ...
 
     async def mark_superseded(
         self,
@@ -94,6 +99,7 @@ class TrainingPlanRepositoryPort(Protocol):
         :param plan_id: 正式训练计划标识。
         :return: 更新后的正式计划；当前状态不允许更新时返回 None。
         """
+        ...
 
 class UserMemoryRepositoryPort(Protocol):
     """用户长期记忆持久化端口。"""
@@ -110,6 +116,7 @@ class UserMemoryRepositoryPort(Protocol):
         :param memory: 待保存的记忆。
         :return: 已保存的记忆。
         """
+        ...
 
     async def list_by_user(
             self,
@@ -121,6 +128,7 @@ class UserMemoryRepositoryPort(Protocol):
         :param user_id: 用户标识。
         :return: 用户长期记忆列表。
         """
+        ...
 
     async def delete_by_id_for_user(self, user_id: str, memory_id: int) -> bool:
         """
@@ -130,6 +138,7 @@ class UserMemoryRepositoryPort(Protocol):
         :param memory_id: 记忆标识。
         :return: 是否成功删除。
         """
+        ...
 
 
 class TrainingPlanProposalRepositoryPort(Protocol):
@@ -149,6 +158,7 @@ class TrainingPlanProposalRepositoryPort(Protocol):
         :param safety_check: 安全检查结果。
         :return: 已创建的提案。
         """
+        ...
 
     async def list_by_user(self, user_id: str) -> list[TrainingPlanProposalResponse]:
         """
@@ -157,6 +167,7 @@ class TrainingPlanProposalRepositoryPort(Protocol):
         :param user_id: 用户标识。
         :return: 用户提案列表。
         """
+        ...
 
     async def get_by_id_for_user(
         self,
@@ -170,6 +181,7 @@ class TrainingPlanProposalRepositoryPort(Protocol):
         :param proposal_id: 提案标识。
         :return: 提案；不存在或不属于该用户时返回 None。
         """
+        ...
 
     async def approve(
         self,
@@ -187,6 +199,7 @@ class TrainingPlanProposalRepositoryPort(Protocol):
         :param decision_note: 用户决策备注。
         :return: 更新后的提案；提案不存在时返回 None。
         """
+        ...
 
     async def reject(
         self,
@@ -202,6 +215,7 @@ class TrainingPlanProposalRepositoryPort(Protocol):
         :param decision_note: 用户决策备注。
         :return: 更新后的提案；提案不存在时返回 None。
         """
+        ...
 
     async def mark_approving(
         self,
@@ -215,6 +229,7 @@ class TrainingPlanProposalRepositoryPort(Protocol):
         :param proposal_id: Proposal 标识。
         :return: 更新后的 Proposal；当前状态不允许更新时返回 None。
         """
+        ...
 
     async def create_revision(
         self,
@@ -232,6 +247,7 @@ class TrainingPlanProposalRepositoryPort(Protocol):
         :param safety_check: 修订计划的确定性安全检查结果。
         :return: 新版本 Proposal；原 Proposal 不可修订时返回 None。
         """
+        ...
 
     async def create_replacement(
         self,
@@ -249,6 +265,7 @@ class TrainingPlanProposalRepositoryPort(Protocol):
         :param safety_check: 替换计划的确定性安全检查结果。
         :return: 替换 Proposal；基础计划不匹配时返回 None。
         """
+        ...
 
 
 class WorkoutSessionRepositoryPort(Protocol):
@@ -272,6 +289,7 @@ class WorkoutSessionRepositoryPort(Protocol):
         :param safety_alert: 根据反馈生成的安全提醒。
         :return: 已保存的训练记录。
         """
+        ...
 
     async def list_by_user(
         self,
@@ -285,6 +303,7 @@ class WorkoutSessionRepositoryPort(Protocol):
         :param plan_id: 可选的训练计划筛选条件。
         :return: 用户训练记录列表。
         """
+        ...
     async def list_by_user_in_period(
         self,
         user_id: str,
@@ -299,3 +318,4 @@ class WorkoutSessionRepositoryPort(Protocol):
         :param end_at: 不包含在查询范围内的结束时间。
         :return: 时间区间内的训练记录列表。
         """
+        ...

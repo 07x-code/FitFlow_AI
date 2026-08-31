@@ -111,5 +111,3 @@ export const recentWorkouts = [
   },
 ];
 
-export const progressPoints = [34, 48, 43, 62, 58, 76, 86];
-

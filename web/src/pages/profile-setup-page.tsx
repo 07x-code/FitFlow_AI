@@ -21,7 +21,7 @@ export function ProfileSetupPage() {
           </span>
           <span>
             <strong>FitFlow</strong>
-            <small>AI COACH</small>
+            <small>智能教练</small>
           </span>
         </Link>
         <Link className="text-link" to="/">
@@ -45,7 +45,7 @@ export function ProfileSetupPage() {
             </li>
             <li>
               <ArrowRight size={19} />
-              画像会参与训练计划和 AI Coach 上下文
+              画像会参与训练计划和 AI 教练上下文
             </li>
           </ul>
         </div>

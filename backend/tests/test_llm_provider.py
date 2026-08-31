@@ -7,6 +7,7 @@ from app.infrastructure.llm.provider import (
     DashScopeLLMProvider,
     DryRunLLMProvider,
     FakeLLMProvider,
+    SiliconFlowLLMProvider,
     create_llm_provider,
 )
 
@@ -58,6 +59,51 @@ def test_create_llm_provider_requires_dashscope_key_when_selected():
                 openai_api_key=None,
                 dashscope_model="qwen-plus",
                 dashscope_base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+            )
+        )
+
+
+def test_create_llm_provider_can_build_siliconflow_provider():
+    """
+    验证工厂可以创建硅基流动免费模型适配器。
+
+    :return: 无返回值。
+    """
+    provider = create_llm_provider(
+        AppSettings(
+            llm_provider="siliconflow",
+            dashscope_api_key=None,
+            openai_api_key=None,
+            dashscope_model="qwen-plus",
+            dashscope_base_url=(
+                "https://dashscope.aliyuncs.com/compatible-mode/v1"
+            ),
+            siliconflow_api_key="siliconflow-test-key",
+        )
+    )
+
+    assert isinstance(provider, SiliconFlowLLMProvider)
+    assert provider.name == "siliconflow"
+    assert provider.model == "Qwen/Qwen3.5-4B"
+    assert provider.base_url == "https://api.siliconflow.cn/v1"
+
+
+def test_create_llm_provider_requires_siliconflow_key_when_selected():
+    """
+    验证启用硅基流动时必须配置 API Key。
+
+    :return: 无返回值。
+    """
+    with pytest.raises(ValueError, match="SILICONFLOW_API_KEY"):
+        create_llm_provider(
+            AppSettings(
+                llm_provider="siliconflow",
+                dashscope_api_key=None,
+                openai_api_key=None,
+                dashscope_model="qwen-plus",
+                dashscope_base_url=(
+                    "https://dashscope.aliyuncs.com/compatible-mode/v1"
+                ),
             )
         )
 

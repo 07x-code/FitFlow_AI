@@ -3,20 +3,32 @@ import {
   ArrowUp,
   BookOpen,
   Bot,
+  CalendarDays,
+  CheckCircle2,
   Layers3,
+  PencilLine,
   RefreshCw,
   ShieldCheck,
   Sparkles,
+  XCircle,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent, KeyboardEvent } from 'react';
+import { Link } from 'react-router';
 
 import {
   FitFlowApiError,
   fitFlowApi,
   type CoachChatResponse,
+  type ProposalDecision,
+  type TrainingPlanProposalResponse,
 } from '../api/client';
-import { Card, Chip, PageHeader } from '../components/ui';
+import { Button, Card, Chip, PageHeader } from '../components/ui';
+import {
+  translateDayName,
+  translateExerciseName,
+  translatePlanText,
+} from '../utils/plan-labels';
 import './coach-api.css';
 
 type Message = {
@@ -40,7 +52,7 @@ const initialMessages: Message[] = [
     id: 1,
     role: 'assistant',
     content:
-      '你好，我是 FitFlow AI Coach。发送问题后，我会通过 FastAPI 读取你的画像、最新计划、长期记忆和本地健身知识，再返回真实回答。',
+      '你好，我是 FitFlow AI 教练。发送问题后，我会读取你的画像、最新计划、长期记忆和健身知识，再给出针对性的回答。',
   },
 ];
 
@@ -49,6 +61,26 @@ const suggestions = [
   'RPE 是什么？',
   '解释这周的计划',
 ];
+
+const planningVerbs = ['制定', '指定', '安排', '生成', '设计', '做一份'];
+const revisionWords = ['修改', '调整', '改成', '换成', '不要', '增加', '减少', '没时间'];
+const approvalPhrases = ['同意', '采用', '确认', '就按这版', '这版可以'];
+
+function isPlanningRequest(message: string) {
+  return (
+    message.includes('计划') &&
+    planningVerbs.some((verb) => message.includes(verb))
+  );
+}
+
+function isRevisionRequest(message: string) {
+  return revisionWords.some((word) => message.includes(word));
+}
+
+function isApprovalRequest(message: string) {
+  const normalized = message.replace(/[，。！？!\s]/g, '');
+  return approvalPhrases.some((phrase) => normalized === phrase);
+}
 
 function describeError(error: unknown) {
   if (error instanceof FitFlowApiError) {
@@ -78,6 +110,12 @@ export function CoachPage() {
   const [messages, setMessages] = useState(initialMessages);
   const [draft, setDraft] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [isPlanning, setIsPlanning] = useState(false);
+  const [isRevising, setIsRevising] = useState(false);
+  const [isDeciding, setIsDeciding] = useState(false);
+  const [proposal, setProposal] =
+    useState<TrainingPlanProposalResponse | null>(null);
+  const [proposalError, setProposalError] = useState<string | null>(null);
   const [failure, setFailure] = useState<RequestFailure | null>(null);
   const [connection, setConnection] =
     useState<ConnectionStatus>('checking');
@@ -92,10 +130,22 @@ export function CoachPage() {
         if (active) {
           setConnection('online');
         }
+
+        return fitFlowApi.listTrainingPlanProposals(USER_ID);
       })
-      .catch(() => {
+      .then((response) => {
         if (active) {
-          setConnection('offline');
+          setProposal(response.proposals[0] ?? null);
+        }
+      })
+      .catch((error) => {
+        if (active) {
+          if (error instanceof FitFlowApiError) {
+            setConnection('online');
+            setProposalError(describeError(error));
+          } else {
+            setConnection('offline');
+          }
         }
       });
 
@@ -109,11 +159,40 @@ export function CoachPage() {
       behavior: 'smooth',
       block: 'nearest',
     });
-  }, [failure, isSending, messages]);
+  }, [failure, isDeciding, isPlanning, isRevising, isSending, messages, proposal]);
 
   const send = async (message: string, appendUser = true) => {
     const content = message.trim();
-    if (!content || isSending) {
+    if (!content || isSending || isPlanning || isRevising || isDeciding) {
+      return;
+    }
+
+    if (proposal?.status === 'pending' && isApprovalRequest(content)) {
+      setMessages((current) => [
+        ...current,
+        { id: Date.now(), role: 'user', content },
+      ]);
+      setDraft('');
+      await decideProposal('approve');
+      return;
+    }
+
+    if (
+      proposal &&
+      ['pending', 'approved'].includes(proposal.status) &&
+      isRevisionRequest(content)
+    ) {
+      setMessages((current) => [
+        ...current,
+        { id: Date.now(), role: 'user', content },
+      ]);
+      setDraft('');
+      await reviseProposal(content);
+      return;
+    }
+
+    if (isPlanningRequest(content)) {
+      await createProposal(content);
       return;
     }
 
@@ -164,6 +243,136 @@ export function CoachPage() {
     }
   };
 
+  const createProposal = async (requestText = '帮我制定下周的训练计划') => {
+    const canCreate =
+      proposal === null ||
+      proposal.status === 'rejected' ||
+      proposal.status === 'superseded';
+    if (isPlanning || isRevising || isDeciding) {
+      return;
+    }
+
+    const nextId = Date.now();
+    setMessages((current) => [
+      ...current,
+      {
+        id: nextId,
+        role: 'user',
+        content: requestText,
+      },
+    ]);
+    setDraft('');
+
+    if (!canCreate) {
+      setMessages((current) => [
+        ...current,
+        {
+          id: nextId + 1,
+          role: 'assistant',
+          content:
+            proposal?.status === 'approved'
+              ? '下周计划已经同步。如需变化，请在计划卡片中选择“调整这份计划”。'
+              : '下周计划正在等待你确认，请在计划卡片中选择采用、修改或暂不采用。',
+        },
+      ]);
+      return;
+    }
+    setProposalError(null);
+    setIsPlanning(true);
+
+    try {
+      const created = await fitFlowApi.createTrainingPlanProposal(USER_ID);
+      setProposal(created);
+      setMessages((current) => [
+        ...current,
+        {
+          id: nextId + 1,
+          role: 'assistant',
+          content: '下周计划已经生成。请检查训练日和动作，确认后再同步为正式计划。',
+        },
+      ]);
+      setConnection('online');
+    } catch (error) {
+      setProposalError(describeError(error));
+      setConnection(error instanceof FitFlowApiError ? 'online' : 'offline');
+    } finally {
+      setIsPlanning(false);
+    }
+  };
+
+  const reviseProposal = async (feedback: string) => {
+    if (
+      !proposal ||
+      !['pending', 'approved'].includes(proposal.status) ||
+      isPlanning ||
+      isRevising ||
+      isDeciding
+    ) {
+      return;
+    }
+
+    setProposalError(null);
+    setIsRevising(true);
+
+    try {
+      const revised = await fitFlowApi.reviseTrainingPlanProposal(
+        USER_ID,
+        proposal.id,
+        feedback,
+      );
+      setProposal(revised);
+      setMessages((current) => [
+        ...current,
+        {
+          id: Date.now(),
+          role: 'assistant',
+          content: `已按你的意见生成第 ${revised.revision} 版计划，请再次确认。`,
+        },
+      ]);
+      setConnection('online');
+    } catch (error) {
+      setProposalError(describeError(error));
+      setConnection(error instanceof FitFlowApiError ? 'online' : 'offline');
+    } finally {
+      setIsRevising(false);
+    }
+  };
+
+  const decideProposal = async (decision: ProposalDecision) => {
+    if (!proposal || proposal.status !== 'pending' || isDeciding) {
+      return;
+    }
+
+    setProposalError(null);
+    setIsDeciding(true);
+
+    try {
+      const decided = await fitFlowApi.decideTrainingPlanProposal(
+        USER_ID,
+        proposal.id,
+        decision,
+      );
+      setProposal(decided);
+      setMessages((current) => [
+        ...current,
+        {
+          id: Date.now(),
+          role: 'assistant',
+          content:
+            decision === 'approve'
+              ? '计划已确认，并已同步到训练计划。'
+              : '这份计划已停止采用，你可以重新制定一份。',
+        },
+      ]);
+      setConnection('online');
+    } catch (error) {
+      setProposalError(describeError(error));
+      setConnection(error instanceof FitFlowApiError ? 'online' : 'offline');
+    } finally {
+      setIsDeciding(false);
+    }
+  };
+
   const connectionText = {
     checking: '检查连接',
     online: '后端在线',
@@ -179,8 +388,8 @@ export function CoachPage() {
             {connectionText}
           </span>
         }
-        eyebrow="真实 FastAPI 对话"
-        title="AI Coach"
+        eyebrow="智能训练助手"
+        title="AI 教练"
       />
 
       <div className="coach-layout">
@@ -216,13 +425,66 @@ export function CoachPage() {
                   <Sparkles size={16} />
                 </span>
                 <div className="message__body">
-                  <span className="typing-dots" aria-label="AI Coach 正在回答">
+                  <span className="typing-dots" aria-label="AI 教练正在回答">
                     <i />
                     <i />
                     <i />
                   </span>
                   <small>正在查询画像、计划和知识库……</small>
                 </div>
+              </div>
+            ) : null}
+
+            {isPlanning ? (
+              <div className="message message--assistant message--loading">
+                <span className="message__avatar">
+                  <Sparkles size={16} />
+                </span>
+                <div className="message__body">
+                  <span className="typing-dots" aria-label="正在制定训练计划">
+                    <i />
+                    <i />
+                    <i />
+                  </span>
+                  <small>正在读取用户画像并执行安全检查……</small>
+                </div>
+              </div>
+            ) : null}
+
+            {isRevising ? (
+              <div className="message message--assistant message--loading">
+                <span className="message__avatar">
+                  <Sparkles size={16} />
+                </span>
+                <div className="message__body">
+                  <span className="typing-dots" aria-label="正在修改训练计划">
+                    <i />
+                    <i />
+                    <i />
+                  </span>
+                  <small>正在根据你的意见生成新版本并重新检查安全性……</small>
+                </div>
+              </div>
+            ) : null}
+
+            {proposal ? (
+              <ProposalCard
+                busy={isDeciding}
+                onCreate={() => void createProposal()}
+                onDecision={(decision) => void decideProposal(decision)}
+                onRevision={(feedback) => void reviseProposal(feedback)}
+                proposal={proposal}
+                revising={isRevising}
+              />
+            ) : null}
+
+            {proposalError ? (
+              <div className="coach-error" role="alert">
+                <AlertCircle size={19} />
+                <span>
+                  <strong>训练计划请求失败</strong>
+                  <small>{proposalError}</small>
+                </span>
               </div>
             ) : null}
 
@@ -234,7 +496,7 @@ export function CoachPage() {
                   <small>{failure.message}</small>
                 </span>
                 <button
-                  disabled={isSending}
+                  disabled={isSending || isPlanning || isRevising || isDeciding}
                   onClick={() => void send(failure.question, false)}
                   type="button">
                   <RefreshCw size={15} />
@@ -246,6 +508,23 @@ export function CoachPage() {
           </div>
 
           <div className="suggestion-row">
+            {proposal?.status === 'approved' ? (
+              <Chip tone="green">
+                <CheckCircle2 size={15} />
+                下周计划已同步
+              </Chip>
+            ) : proposal?.status === 'pending' ||
+              proposal?.status === 'approving' ? (
+              <Chip tone="blue">
+                <CalendarDays size={15} />
+                下周计划待确认
+              </Chip>
+            ) : (
+              <Chip onClick={() => void createProposal()} tone="green">
+                <CalendarDays size={15} />
+                制定下周计划
+              </Chip>
+            )}
             {suggestions.map((suggestion) => (
               <Chip
                 key={suggestion}
@@ -257,8 +536,8 @@ export function CoachPage() {
 
           <form className="chat-composer" onSubmit={submit}>
             <textarea
-              aria-label="向 AI Coach 提问"
-              disabled={isSending}
+              aria-label="向 AI 教练提问"
+              disabled={isSending || isPlanning || isRevising || isDeciding}
               maxLength={1000}
               onChange={(event) => setDraft(event.target.value)}
               onKeyDown={submitOnEnter}
@@ -268,7 +547,7 @@ export function CoachPage() {
             />
             <button
               aria-label="发送消息"
-              disabled={isSending || !draft.trim()}
+              disabled={isSending || isPlanning || isRevising || isDeciding || !draft.trim()}
               type="submit">
               <ArrowUp size={20} />
             </button>
@@ -307,12 +586,164 @@ export function CoachPage() {
   );
 }
 
+function ProposalCard({
+  proposal,
+  busy,
+  onDecision,
+  onCreate,
+  onRevision,
+  revising,
+}: {
+  proposal: TrainingPlanProposalResponse;
+  busy: boolean;
+  onDecision: (decision: ProposalDecision) => void;
+  onCreate: () => void;
+  onRevision: (feedback: string) => void;
+  revising: boolean;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [feedback, setFeedback] = useState('');
+  const pending = proposal.status === 'pending';
+  const approved = proposal.status === 'approved';
+  const rejected = proposal.status === 'rejected';
+
+  return (
+    <Card as="article" className="proposal-card">
+      <div className="proposal-card__header">
+        <span className="colored-icon">
+          <CalendarDays size={20} />
+        </span>
+        <div>
+          <p className="eyebrow">下周训练提案 · 修订 {proposal.revision}</p>
+          <h2>{translatePlanText(proposal.plan.goal_summary)}</h2>
+          <small>
+            {proposal.plan.week_start} 至 {proposal.plan.week_end}
+          </small>
+        </div>
+        <Chip tone={approved ? 'green' : rejected ? 'orange' : 'blue'}>
+          {approved ? '已同步' : rejected ? '未采用' : '待确认'}
+        </Chip>
+      </div>
+
+      <div className="proposal-days">
+        {proposal.plan.days.map((day) => (
+          <article key={day.scheduled_date}>
+            <span>{day.scheduled_date}</span>
+            <strong>{translateDayName(day.name)}</strong>
+            <p>{day.focus}</p>
+            <small>
+              {day.estimated_minutes} 分钟 · {day.exercises.length} 个动作
+            </small>
+            <ul>
+              {day.exercises.map((exercise) => (
+                <li key={exercise.exercise_name}>
+                  <span>{translateExerciseName(exercise.exercise_name)}</span>
+                  <small>
+                    {exercise.sets} 组 × {exercise.reps_min}–{exercise.reps_max} 次 · RPE {exercise.target_rpe}
+                  </small>
+                </li>
+              ))}
+            </ul>
+          </article>
+        ))}
+      </div>
+
+      <div className="proposal-safety">
+        <ShieldCheck size={17} />
+        {proposal.safety_check.valid
+          ? '确定性安全检查已通过'
+          : `发现 ${proposal.safety_check.violations.length} 项安全问题`}
+      </div>
+
+      {pending ? (
+        <div className="proposal-actions">
+          <Button
+            disabled={busy}
+            icon={CheckCircle2}
+            onClick={() => onDecision('approve')}>
+            {busy ? '正在同步…' : '同意并同步'}
+          </Button>
+          <Button
+            disabled={busy || revising}
+            icon={PencilLine}
+            onClick={() => setEditing(true)}
+            variant="secondary">
+            提出修改
+          </Button>
+          <Button
+            disabled={busy}
+            icon={XCircle}
+            onClick={() => onDecision('reject')}
+            variant="danger">
+            不采用
+          </Button>
+        </div>
+      ) : null}
+
+      {approved ? (
+        <Button
+          disabled={revising}
+          icon={PencilLine}
+          onClick={() => setEditing(true)}
+          variant="secondary">
+          调整这份计划
+        </Button>
+      ) : null}
+
+      {editing ? (
+        <form
+          className="proposal-revision"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!feedback.trim()) {
+              return;
+            }
+            onRevision(feedback.trim());
+            setEditing(false);
+            setFeedback('');
+          }}>
+          <label htmlFor={`proposal-feedback-${proposal.id}`}>告诉 AI 需要怎么修改</label>
+          <textarea
+            disabled={revising}
+            id={`proposal-feedback-${proposal.id}`}
+            maxLength={500}
+            onChange={(event) => setFeedback(event.target.value)}
+            placeholder="例如：周三没时间，改到周四；动作尽量使用哑铃。"
+            rows={3}
+            value={feedback}
+          />
+          <div>
+            <Button disabled={revising || !feedback.trim()} type="submit">
+              {revising ? '正在生成…' : '生成修改版'}
+            </Button>
+            <Button onClick={() => setEditing(false)} type="button" variant="secondary">
+              取消
+            </Button>
+          </div>
+        </form>
+      ) : null}
+
+      {approved ? (
+        <Link className="proposal-link" to="/app/plans">
+          查看已同步的训练计划
+        </Link>
+      ) : null}
+
+      {rejected ? (
+        <Button icon={RefreshCw} onClick={onCreate} variant="secondary">
+          重新制定
+        </Button>
+      ) : null}
+    </Card>
+  );
+}
+
 function ResponseEvidence({ response }: { response: CoachChatResponse }) {
   return (
     <div className="response-evidence">
       <div className="response-meta">
         <span className={`safety-level is-${response.safety_level}`}>
-          安全等级：{response.safety_level}
+          安全等级：{response.safety_level === 'low' ? '低' : response.safety_level}
         </span>
         {response.referenced_plan_id ? (
           <span>引用计划 #{response.referenced_plan_id}</span>

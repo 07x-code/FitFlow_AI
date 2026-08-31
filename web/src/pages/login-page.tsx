@@ -24,7 +24,7 @@ export function LoginPage() {
           </span>
           <span>
             <strong>FitFlow</strong>
-            <small>AI COACH</small>
+            <small>智能教练</small>
           </span>
         </Link>
 
@@ -137,4 +137,3 @@ export function LoginPage() {
     </main>
   );
 }
-

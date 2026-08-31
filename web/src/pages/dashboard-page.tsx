@@ -80,8 +80,8 @@ export function DashboardPage() {
 
           <SectionTitle
             action={
-              <Link className="section-link" to="/app/progress">
-                查看报告 <ArrowRight size={15} />
+              <Link className="section-link" to="/app/plans">
+                查看计划 <ArrowRight size={15} />
               </Link>
             }>
             本周节奏
@@ -113,8 +113,8 @@ export function DashboardPage() {
 
           <SectionTitle
             action={
-              <Link className="section-link" to="/app/progress">
-                全部记录 <ArrowRight size={15} />
+              <Link className="section-link" to="/app/exercises">
+                浏览动作 <ArrowRight size={15} />
               </Link>
             }>
             最近训练
@@ -142,13 +142,13 @@ export function DashboardPage() {
             <div className="coach-card__icon">
               <Sparkles size={22} />
             </div>
-            <p className="eyebrow">AI COACH 提示</p>
+            <p className="eyebrow">AI 教练提示</p>
             <h3>今天状态不错</h3>
             <p>
               保持计划重量。如果前两组 RPE 低于 7，最后一组可以增加 2.5 kg。
             </p>
             <Link to="/app/coach">
-              问问 AI Coach <ArrowRight size={15} />
+              问问 AI 教练 <ArrowRight size={15} />
             </Link>
           </Card>
 
@@ -179,4 +179,3 @@ export function DashboardPage() {
     </div>
   );
 }
-

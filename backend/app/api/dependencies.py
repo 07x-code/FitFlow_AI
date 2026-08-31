@@ -48,7 +48,7 @@ async def get_database_session(
 def get_profile_use_cases(
     session: Annotated[
         AsyncSession,
-        Depends(get_database_session),
+        Depends(get_database_session, scope="function"),
     ],
 ) -> ProfileUseCases:
     """
@@ -62,7 +62,7 @@ def get_profile_use_cases(
 def get_proposal_use_cases(
     session: Annotated[
         AsyncSession,
-        Depends(get_database_session),
+        Depends(get_database_session, scope="function"),
     ],
 ) -> ProposalUseCases:
     """
@@ -71,13 +71,13 @@ def get_proposal_use_cases(
     :param session: 当前请求共享的异步数据库 Session。
     :return: Proposal 应用用例。
     """
-    return create_proposal_use_cases(session)
+    return create_proposal_use_cases(session, get_container())
 
 
 def get_training_plan_use_cases(
     session: Annotated[
         AsyncSession,
-        Depends(get_database_session),
+        Depends(get_database_session, scope="function"),
     ],
 ) -> TrainingPlanUseCases:
     """
@@ -97,7 +97,7 @@ def get_training_plan_use_cases(
 def get_memory_use_cases(
     session: Annotated[
         AsyncSession,
-        Depends(get_database_session),
+        Depends(get_database_session, scope="function"),
     ],
 ) -> MemoryUseCases:
     """
@@ -120,7 +120,7 @@ def get_working_memory_use_cases() -> WorkingMemoryUseCases:
 def get_coach_use_cases(
     session: Annotated[
         AsyncSession,
-        Depends(get_database_session),
+        Depends(get_database_session, scope="function"),
     ],
 ) -> CoachUseCases:
     """
@@ -141,7 +141,7 @@ def get_coach_use_cases(
 def get_workout_use_cases(
     session: Annotated[
         AsyncSession,
-        Depends(get_database_session),
+        Depends(get_database_session, scope="function"),
     ],
 ) -> WorkoutUseCases:
     """
@@ -156,7 +156,7 @@ def get_workout_use_cases(
 def get_report_use_cases(
     session: Annotated[
         AsyncSession,
-        Depends(get_database_session),
+        Depends(get_database_session, scope="function"),
     ],
 ) -> ReportUseCases:
     """

@@ -28,6 +28,86 @@ export type CoachChatResponse = {
   knowledge_sources: KnowledgeSource[];
 };
 
+export type ExercisePrescription = {
+  exercise_name: string;
+  sets: number;
+  reps_min: number;
+  reps_max: number;
+  target_rpe: number;
+};
+
+export type WorkoutDayDraft = {
+  scheduled_date: string;
+  name: string;
+  focus: string;
+  estimated_minutes: number;
+  exercises: ExercisePrescription[];
+};
+
+export type TrainingPlanDraft = {
+  week_start: string;
+  week_end: string;
+  timezone: string;
+  goal_summary: string;
+  days: WorkoutDayDraft[];
+};
+
+export type SafetyCheckResult = {
+  valid: boolean;
+  violations: Record<string, string>[];
+};
+
+export type ProposalDecision = 'approve' | 'reject';
+
+export type ProposalStatus =
+  | 'pending'
+  | 'approving'
+  | 'approved'
+  | 'rejected'
+  | 'superseded';
+
+export type TrainingPlanProposalResponse = {
+  id: number;
+  type: 'training_plan';
+  operation: 'create' | 'replace' | 'adjust';
+  target_week_start: string;
+  base_plan_id: number | null;
+  parent_proposal_id: number | null;
+  revision: number;
+  status: ProposalStatus;
+  plan: TrainingPlanDraft;
+  safety_check: SafetyCheckResult;
+  generation_summary: string;
+  approved_plan_id: number | null;
+  decision_note: string | null;
+  created_at: string;
+  decided_at: string | null;
+};
+
+export type ProposalListResponse = {
+  proposals: TrainingPlanProposalResponse[];
+};
+
+export type TrainingPlanStatus =
+  | 'scheduled'
+  | 'active'
+  | 'superseded'
+  | 'completed';
+
+export type TrainingPlanHistoryItem = {
+  id: number;
+  version: number;
+  status: TrainingPlanStatus;
+  source_proposal_id: number;
+  plan: TrainingPlanDraft;
+  safety_check: SafetyCheckResult;
+  created_at: string;
+};
+
+export type TrainingPlanHistoryResponse = {
+  plans: TrainingPlanHistoryItem[];
+};
+
 export class FitFlowApiError extends Error {
   constructor(
     message: string,
@@ -114,9 +194,42 @@ export const fitFlowApi = {
   createProfile: (userId: string, profile: unknown) =>
     request('/api/profiles', { method: 'POST', userId, body: profile }),
   listTrainingPlans: (userId: string) =>
-    request('/api/training-plans/history', { userId }),
-  createTrainingPlan: (userId: string) =>
-    request('/api/training-plans/draft', { method: 'POST', userId }),
+    request<TrainingPlanHistoryResponse>('/api/training-plans/history', {
+      userId,
+    }),
+  createTrainingPlanProposal: (userId: string) =>
+    request<TrainingPlanProposalResponse>('/api/proposals/training-plan', {
+      method: 'POST',
+      userId,
+    }),
+  listTrainingPlanProposals: (userId: string) =>
+    request<ProposalListResponse>('/api/proposals', { userId }),
+  decideTrainingPlanProposal: (
+    userId: string,
+    proposalId: number,
+    decision: ProposalDecision,
+  ) =>
+    request<TrainingPlanProposalResponse>(
+      `/api/proposals/${proposalId}/decision`,
+      {
+        method: 'POST',
+        userId,
+        body: { decision },
+      },
+    ),
+  reviseTrainingPlanProposal: (
+    userId: string,
+    proposalId: number,
+    feedback: string,
+  ) =>
+    request<TrainingPlanProposalResponse>(
+      `/api/proposals/${proposalId}/revisions`,
+      {
+        method: 'POST',
+        userId,
+        body: { feedback },
+      },
+    ),
   chatWithCoach: (userId: string, message: string) => {
     ensureCoachSessionCleanup(userId);
     return request<CoachChatResponse>('/api/coach/chat', {
