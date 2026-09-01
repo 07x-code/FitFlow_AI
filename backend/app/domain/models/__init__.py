@@ -9,6 +9,7 @@ from app.domain.models.coach import (
     CoachChatResponse,
     FitnessKnowledgeItem,
     KnowledgeSource,
+    MemoryMutationEvent,
 )
 from app.domain.models.plan import (
     ExercisePrescription,
@@ -30,6 +31,7 @@ from app.domain.models.profile import (
     Sex,
 )
 from app.domain.models.proposal import (
+    ManualTrainingPlanProposalRequest,
     ProposalDecision,
     ProposalDecisionRequest,
     ProposalListResponse,
@@ -37,10 +39,14 @@ from app.domain.models.proposal import (
     ProposalRevisionRequest,
     ProposalStatus,
     ProposalType,
+    TrainingPlanProposalCreateRequest,
     TrainingPlanProposalResponse,
 )
 from app.domain.models.report import WeeklyReportMetrics, WeeklyReportResponse
 from app.domain.models.user_memory import (
+    MemoryCandidate,
+    MemoryCommand,
+    MemoryCommandAction,
     MemoryType,
     UserMemoryCreate,
     UserMemoryListResponse,
@@ -69,7 +75,12 @@ __all__ = [
     "FitnessKnowledgeItem",
     "FitnessProfileCreate",
     "KnowledgeSource",
+    "MemoryCandidate",
+    "MemoryCommand",
+    "MemoryCommandAction",
+    "MemoryMutationEvent",
     "MemoryType",
+    "ManualTrainingPlanProposalRequest",
     "NutritionTargets",
     "ProfileAssessmentResponse",
     "ProposalDecision",
@@ -88,6 +99,7 @@ __all__ = [
     "TrainingPlanStatus",
     "TrainingPlanHistoryItem",
     "TrainingPlanHistoryResponse",
+    "TrainingPlanProposalCreateRequest",
     "TrainingPlanProposalResponse",
     "UserMemoryCreate",
     "UserMemoryListResponse",

@@ -26,6 +26,19 @@ export type CoachChatResponse = {
   safety_level: string;
   referenced_plan_id: number | null;
   knowledge_sources: KnowledgeSource[];
+  memory_events: MemoryMutationEvent[];
+};
+
+export type MemoryMutationEvent = {
+  action: 'remembered' | 'forgotten';
+  memory_id: number;
+  type:
+    | 'preferred_equipment'
+    | 'disliked_exercise'
+    | 'training_time'
+    | 'physical_limitation'
+    | 'general_note';
+  content: string;
 };
 
 export type ExercisePrescription = {
@@ -106,6 +119,38 @@ export type TrainingPlanHistoryItem = {
 
 export type TrainingPlanHistoryResponse = {
   plans: TrainingPlanHistoryItem[];
+};
+
+export type WorkoutSetLog = {
+  exercise_id: string | null;
+  exercise_name: string;
+  set_number: number;
+  weight_kg: number;
+  reps: number;
+  rpe: number;
+};
+
+export type WorkoutSafetyAlert = {
+  level: string;
+  message: string;
+};
+
+export type WorkoutSessionResponse = {
+  id: number;
+  plan_id: number;
+  plan_day_index: number;
+  plan_day_name: string;
+  completed: boolean;
+  fatigue_level: number;
+  pain_level: number;
+  notes: string | null;
+  sets: WorkoutSetLog[];
+  safety_alert: WorkoutSafetyAlert | null;
+  created_at: string;
+};
+
+export type WorkoutHistoryResponse = {
+  sessions: WorkoutSessionResponse[];
 };
 
 export class FitFlowApiError extends Error {
@@ -197,11 +242,27 @@ export const fitFlowApi = {
     request<TrainingPlanHistoryResponse>('/api/training-plans/history', {
       userId,
     }),
-  createTrainingPlanProposal: (userId: string) =>
+  listWorkoutHistory: (userId: string) =>
+    request<WorkoutHistoryResponse>('/api/workouts/history', { userId }),
+  createTrainingPlanProposal: (userId: string, message?: string) =>
     request<TrainingPlanProposalResponse>('/api/proposals/training-plan', {
       method: 'POST',
       userId,
+      body: message ? { message } : undefined,
     }),
+  createManualTrainingPlanProposal: (
+    userId: string,
+    basePlanId: number,
+    plan: TrainingPlanDraft,
+  ) =>
+    request<TrainingPlanProposalResponse>(
+      '/api/proposals/training-plan/manual-replacement',
+      {
+        method: 'POST',
+        userId,
+        body: { base_plan_id: basePlanId, plan },
+      },
+    ),
   listTrainingPlanProposals: (userId: string) =>
     request<ProposalListResponse>('/api/proposals', { userId }),
   decideTrainingPlanProposal: (
@@ -244,6 +305,11 @@ export const fitFlowApi = {
       method: 'DELETE',
       userId,
       keepalive,
+    }),
+  deleteMemory: (userId: string, memoryId: number) =>
+    request<void>(`/api/memories/${memoryId}`, {
+      method: 'DELETE',
+      userId,
     }),
   createWeeklyReport: (userId: string) =>
     request('/api/reports/weekly', { method: 'POST', userId }),

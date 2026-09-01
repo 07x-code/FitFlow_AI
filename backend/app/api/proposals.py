@@ -5,9 +5,11 @@ from fastapi import APIRouter, Depends, Header, status
 from app.api.dependencies import get_proposal_use_cases
 from app.application.use_cases.proposals import ProposalUseCases
 from app.domain.models import (
+    ManualTrainingPlanProposalRequest,
     ProposalDecisionRequest,
     ProposalListResponse,
     ProposalRevisionRequest,
+    TrainingPlanProposalCreateRequest,
     TrainingPlanProposalResponse,
 )
 
@@ -23,8 +25,41 @@ router = APIRouter(prefix="/api/proposals", tags=["proposals"])
 async def create_training_plan_proposal(
     user_id: Annotated[str, Header(alias="X-User-ID")],
     use_cases: Annotated[ProposalUseCases, Depends(get_proposal_use_cases)],
+    request: TrainingPlanProposalCreateRequest | None = None,
 ) -> TrainingPlanProposalResponse:
-    return await use_cases.create_training_plan(user_id)
+    """
+    创建等待用户确认的训练计划提案，并处理请求中的稳定记忆。
+
+    :param user_id: 用户标识。
+    :param use_cases: Proposal 应用用例。
+    :param request: 可选的自然语言计划请求。
+    :return: 已生成的训练计划提案。
+    """
+    return await use_cases.create_training_plan(
+        user_id,
+        message=request.message if request is not None else None,
+    )
+
+
+@router.post(
+    "/training-plan/manual-replacement",
+    response_model=TrainingPlanProposalResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_manual_training_plan_proposal(
+    request: ManualTrainingPlanProposalRequest,
+    user_id: Annotated[str, Header(alias="X-User-ID")],
+    use_cases: Annotated[ProposalUseCases, Depends(get_proposal_use_cases)],
+) -> TrainingPlanProposalResponse:
+    """
+    将用户人工编辑的正式训练计划创建为待确认替换提案。
+
+    :param request: 人工编辑后的计划和被替换计划标识。
+    :param user_id: 用户标识。
+    :param use_cases: Proposal 应用用例。
+    :return: 等待用户确认的替换提案。
+    """
+    return await use_cases.create_manual_replacement(user_id, request)
 
 
 @router.get("", response_model=ProposalListResponse)

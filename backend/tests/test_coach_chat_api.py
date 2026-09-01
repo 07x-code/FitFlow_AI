@@ -119,6 +119,7 @@ def test_coach_chat_blocks_risky_profile_without_calling_llm(client: TestClient)
         "safety_level": "blocked",
         "referenced_plan_id": None,
         "knowledge_sources": [],
+        "memory_events": [],
     }
 
 
@@ -169,3 +170,82 @@ def test_coach_chat_returns_no_sources_for_unrelated_question(client: TestClient
 
     assert response.status_code == 200
     assert response.json()["knowledge_sources"] == []
+
+
+def test_coach_chat_saves_and_deduplicates_explicit_long_term_memory(
+    client: TestClient,
+) -> None:
+    """
+    验证 Coach 自动保存明确偏好，并避免生成重复 active 记忆。
+
+    :param client: 已连接测试数据库的客户端。
+    :return: 无返回值。
+    """
+    user_id = unique_user_id("coach-memory-user")
+    save_profile(client, user_id)
+    headers = coach_headers(user_id)
+
+    first = client.post(
+        "/api/coach/chat",
+        headers=headers,
+        json={"message": "我不喜欢飞鸟，以后别安排。"},
+    )
+    second = client.post(
+        "/api/coach/chat",
+        headers=headers,
+        json={"message": "我不喜欢飞鸟。"},
+    )
+    memories = client.get(
+        "/api/memories",
+        headers={"X-User-ID": user_id},
+    )
+
+    assert first.status_code == 200
+    assert first.json()["memory_events"] == [
+        {
+            "action": "remembered",
+            "memory_id": first.json()["memory_events"][0]["memory_id"],
+            "type": "disliked_exercise",
+            "content": "以后不安排飞鸟。",
+        }
+    ]
+    assert second.status_code == 200
+    assert second.json()["memory_events"] == []
+    assert memories.status_code == 200
+    assert [item["content"] for item in memories.json()["memories"]] == [
+        "以后不安排飞鸟。"
+    ]
+
+
+def test_coach_chat_forgets_explicit_long_term_memory(
+    client: TestClient,
+) -> None:
+    """
+    验证用户改变动作偏好后停用对应长期记忆。
+
+    :param client: 已连接测试数据库的客户端。
+    :return: 无返回值。
+    """
+    user_id = unique_user_id("coach-forget-memory-user")
+    save_profile(client, user_id)
+    headers = coach_headers(user_id)
+    client.post(
+        "/api/coach/chat",
+        headers=headers,
+        json={"message": "我不喜欢飞鸟。"},
+    )
+
+    response = client.post(
+        "/api/coach/chat",
+        headers=headers,
+        json={"message": "我现在喜欢飞鸟了。"},
+    )
+    memories = client.get(
+        "/api/memories",
+        headers={"X-User-ID": user_id},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["memory_events"][0]["action"] == "forgotten"
+    assert response.json()["memory_events"][0]["content"] == "已不再排除飞鸟。"
+    assert memories.json() == {"memories": []}

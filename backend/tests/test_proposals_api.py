@@ -122,6 +122,64 @@ def test_approve_training_plan_proposal_saves_plan_to_history(client: TestClient
     assert history["plans"][0]["plan"] == proposal["plan"]
 
 
+def test_manual_plan_edit_creates_confirmed_replacement(client: TestClient):
+    """
+    验证人工添加动作会先创建替换提案，并在确认后生成新版本正式计划。
+
+    :param client: 已连接测试数据库的客户端。
+    :return: 无返回值。
+    """
+    user_id = unique_user_id("manual-plan-edit-user")
+    save_profile(client, user_id)
+    original_proposal = create_proposal(client, user_id)
+    approval = client.post(
+        f"/api/proposals/{original_proposal['id']}/decision",
+        headers={"X-User-ID": user_id},
+        json={"decision": "approve"},
+    )
+    assert approval.status_code == 200
+
+    base_plan_id = approval.json()["approved_plan_id"]
+    edited_plan = original_proposal["plan"]
+    edited_plan["days"][0]["exercises"].append(
+        {
+            "exercise_name": "哑铃卧推",
+            "sets": 3,
+            "reps_min": 8,
+            "reps_max": 12,
+            "target_rpe": 7,
+        }
+    )
+    replacement_response = client.post(
+        "/api/proposals/training-plan/manual-replacement",
+        headers={"X-User-ID": user_id},
+        json={"base_plan_id": base_plan_id, "plan": edited_plan},
+    )
+
+    assert replacement_response.status_code == 201
+    replacement = replacement_response.json()
+    assert replacement["operation"] == "replace"
+    assert replacement["base_plan_id"] == base_plan_id
+    assert replacement["status"] == "pending"
+    assert replacement["plan"]["days"][0]["exercises"][-1][
+        "exercise_name"
+    ] == "哑铃卧推"
+    assert len(get_history(client, user_id)["plans"]) == 1
+
+    confirmation = client.post(
+        f"/api/proposals/{replacement['id']}/decision",
+        headers={"X-User-ID": user_id},
+        json={"decision": "approve"},
+    )
+    history = get_history(client, user_id)["plans"]
+
+    assert confirmation.status_code == 200
+    assert confirmation.json()["status"] == "approved"
+    assert history[0]["version"] == 2
+    assert history[0]["plan"] == edited_plan
+    assert history[1]["status"] == "superseded"
+
+
 def test_reject_training_plan_proposal_does_not_save_history(client: TestClient):
     user_id = unique_user_id("reject-proposal-user")
     save_profile(client, user_id)
@@ -205,3 +263,29 @@ def test_proposal_decision_rejects_already_decided_proposal(client: TestClient):
     assert second_response.json()["detail"] == "Proposal has already been decided."
     history = get_history(client, user_id)
     assert len(history["plans"]) == 1
+
+
+def test_plan_request_saves_explicit_equipment_memory(client: TestClient):
+    """
+    验证同一句计划请求中的稳定器械条件会写入长期记忆。
+
+    :param client: 已连接测试数据库的客户端。
+    :return: 无返回值。
+    """
+    user_id = unique_user_id("proposal-memory-user")
+    save_profile(client, user_id)
+
+    response = client.post(
+        "/api/proposals/training-plan",
+        headers={"X-User-ID": user_id},
+        json={"message": "我家里只有哑铃，帮我制定下周训练计划。"},
+    )
+    memories = client.get(
+        "/api/memories",
+        headers={"X-User-ID": user_id},
+    )
+
+    assert response.status_code == 201
+    assert memories.status_code == 200
+    assert memories.json()["memories"][0]["type"] == "preferred_equipment"
+    assert memories.json()["memories"][0]["content"] == "我家里只有哑铃。"

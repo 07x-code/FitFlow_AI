@@ -64,9 +64,10 @@ def test_user_memory_table_metadata():
     assert set(table.columns.keys()) == {
         "id",
         "user_id",
-        "memory_type",
-        "content",
-        "source",
+            "memory_type",
+            "content",
+            "memory_key",
+            "source",
         "status",
         "confirmed_at",
         "created_at",
@@ -161,7 +162,6 @@ def test_training_plan_table_metadata():
         for index in table.indexes
         if index.name == "uq_training_plans_user_week_current"
     )
-
     assert current_plan_index.unique is True
     assert tuple(
         column.name for column in current_plan_index.columns
@@ -401,4 +401,3 @@ def test_workout_session_table_metadata():
         plan_foreign_key.name
         == "fk_workout_sessions_plan"
     )
-    

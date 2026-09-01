@@ -226,7 +226,11 @@ class DashScopeLLMProvider:
                 }
                 for tool in tools
             ]
-            payload["tool_choice"] = "auto"
+            payload["tool_choice"] = (
+                "required"
+                if any(tool.force_call for tool in tools)
+                else "auto"
+            )
 
         response_body = self._post_chat_completion(payload)
         content, tool_calls = _extract_tool_completion(response_body)

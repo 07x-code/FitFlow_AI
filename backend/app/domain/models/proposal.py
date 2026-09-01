@@ -67,10 +67,23 @@ class ProposalDecisionRequest(BaseModel):
     decision_note: str | None = Field(default=None, max_length=500)
 
 
+class TrainingPlanProposalCreateRequest(BaseModel):
+    """通过自然语言创建训练计划提案的可选输入。"""
+
+    message: str = Field(min_length=1, max_length=1000)
+
+
 class ProposalRevisionRequest(BaseModel):
     """用户提交的训练计划修改意见。"""
 
     feedback: str = Field(min_length=2, max_length=500)
+
+
+class ManualTrainingPlanProposalRequest(BaseModel):
+    """用户人工编辑正式训练计划后提交的替换提案。"""
+
+    base_plan_id: int = Field(gt=0)
+    plan: TrainingPlanDraft
 
 
 class TrainingPlanProposalResponse(BaseModel):

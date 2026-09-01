@@ -130,6 +130,36 @@ class UserMemoryRepositoryPort(Protocol):
         """
         ...
 
+    async def upsert_by_key(
+        self,
+        user_id: str,
+        memory: UserMemoryCreate,
+    ) -> UserMemoryResponse | None:
+        """
+        按规范化键新增或更新一条 active 长期记忆。
+
+        :param user_id: 用户标识。
+        :param memory: 包含规范化键的长期记忆。
+        :return: 发生新增或内容更新时返回记忆；内容未变化时返回 None。
+        """
+        ...
+
+    async def forget_by_key(
+        self,
+        user_id: str,
+        memory_type: str,
+        memory_key: str,
+    ) -> UserMemoryResponse | None:
+        """
+        按规范化键软删除一条 active 长期记忆。
+
+        :param user_id: 用户标识。
+        :param memory_type: 长期记忆类型。
+        :param memory_key: 规范化记忆键。
+        :return: 已停用的记忆；不存在时返回 None。
+        """
+        ...
+
     async def delete_by_id_for_user(self, user_id: str, memory_id: int) -> bool:
         """
         删除属于指定用户的长期记忆。

@@ -56,6 +56,7 @@ def create_proposal_use_cases(
         profiles=ProfileRepository(session),
         proposals=TrainingPlanProposalRepository(session),
         plans=TrainingPlanRepository(session),
+        memories=UserMemoryRepository(session),
         llm=shared.llm_provider,
     )
 
@@ -105,15 +106,20 @@ def create_coach_use_cases(
     :param shared: 应用共享组件容器。
     :return: AI 教练应用用例。
     """
+    memory_repository = UserMemoryRepository(session)
     return CoachUseCases(
         agent=create_coach_agent(
             profile_repository=ProfileRepository(session),
             training_plan_repository=TrainingPlanRepository(session),
-            memory_repository=UserMemoryRepository(session),
+            memory_repository=memory_repository,
             knowledge_retriever=shared.knowledge_retriever,
             llm_provider=shared.llm_provider,
             working_memory=shared.working_memory_store,
-        )
+        ),
+        memories=MemoryUseCases(
+            memory_repository,
+            llm=shared.llm_provider,
+        ),
     )
 
 

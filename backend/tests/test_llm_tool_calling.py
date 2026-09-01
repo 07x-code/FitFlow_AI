@@ -123,3 +123,55 @@ def test_dashscope_provider_sends_tools_and_parses_tool_calls(monkeypatch):
         "query": "RPE",
         "limit": 2,
     }
+
+
+def test_dashscope_provider_can_require_a_tool_call(monkeypatch) -> None:
+    """
+    验证指定工具可要求兼容接口必须返回工具调用。
+
+    :param monkeypatch: Pytest 提供的运行时替换工具。
+    :return: 无返回值。
+    """
+    captured: dict[str, object] = {}
+
+    def fake_post_chat_completion(self, payload):
+        """
+        捕获模型请求并返回空文本结果。
+
+        :param self: 当前大模型适配器。
+        :param payload: 待发送的兼容接口请求体。
+        :return: 模拟聊天补全响应。
+        """
+        del self
+        captured.update(payload)
+        return {
+            "model": "qwen-plus",
+            "choices": [
+                {"message": {"content": "无候选", "tool_calls": []}}
+            ],
+        }
+
+    monkeypatch.setattr(
+        DashScopeLLMProvider,
+        "_post_chat_completion",
+        fake_post_chat_completion,
+    )
+    provider = DashScopeLLMProvider(
+        api_key="dashscope-test-key",
+        model="qwen-plus",
+        base_url="https://dashscope.example/compatible-mode/v1",
+    )
+
+    provider.complete_with_tools(
+        messages=[LLMMessage(role="user", content="提取记忆")],
+        tools=(
+            LLMToolDefinition(
+                name="extract_memory",
+                description="提取长期记忆。",
+                parameters={"type": "object", "properties": {}},
+                force_call=True,
+            ),
+        ),
+    )
+
+    assert captured["tool_choice"] == "required"

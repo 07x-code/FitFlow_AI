@@ -38,6 +38,7 @@ class UserMemoryRepository:
             memory_type=memory.type.value,
             content=memory.content,
             source=memory.source,
+            memory_key=memory.memory_key,
         )
         self._session.add(record)
 
@@ -68,6 +69,64 @@ class UserMemoryRepository:
 
         return [self._to_response(record) for record in records]
 
+    async def upsert_by_key(
+        self,
+        user_id: str,
+        memory: UserMemoryCreate,
+    ) -> UserMemoryResponse | None:
+        """
+        按规范化键新增或更新一条 active 长期记忆。
+
+        :param user_id: 用户标识。
+        :param memory: 包含规范化键的长期记忆。
+        :return: 发生新增或内容更新时返回记忆；内容未变化时返回 None。
+        """
+        if memory.memory_key is None:
+            raise ValueError("memory_key is required for memory upsert")
+
+        record = await self._get_active_by_key(
+            user_id,
+            memory.type.value,
+            memory.memory_key,
+        )
+        if record is None:
+            return await self.create(user_id, memory)
+        if record.content == memory.content:
+            return None
+
+        record.content = memory.content
+        record.source = memory.source
+        await self._session.flush()
+        await self._session.refresh(record)
+        return self._to_response(record)
+
+    async def forget_by_key(
+        self,
+        user_id: str,
+        memory_type: str,
+        memory_key: str,
+    ) -> UserMemoryResponse | None:
+        """
+        按规范化键软删除一条 active 长期记忆。
+
+        :param user_id: 用户标识。
+        :param memory_type: 长期记忆类型。
+        :param memory_key: 规范化记忆键。
+        :return: 已停用的记忆；不存在时返回 None。
+        """
+        record = await self._get_active_by_key(
+            user_id,
+            memory_type,
+            memory_key,
+        )
+        if record is None:
+            return None
+
+        record.status = "deleted"
+        await self._session.flush()
+        await self._session.refresh(record)
+        return self._to_response(record)
+
 
     async def delete_by_id_for_user(
             self,
@@ -84,15 +143,38 @@ class UserMemoryRepository:
         statement = select(UserMemoryRecord).where(
             UserMemoryRecord.id == memory_id,
             UserMemoryRecord.user_id == user_id,
+            UserMemoryRecord.status == "active",
         )
         record = await self._session.scalar(statement)
 
         if record is None:
             return False
 
-        await self._session.delete(record)
+        record.status = "deleted"
         await self._session.flush()
         return True
+
+    async def _get_active_by_key(
+        self,
+        user_id: str,
+        memory_type: str,
+        memory_key: str,
+    ) -> UserMemoryRecord | None:
+        """
+        查询指定用户和规范化键对应的 active 长期记忆。
+
+        :param user_id: 用户标识。
+        :param memory_type: 长期记忆类型。
+        :param memory_key: 规范化记忆键。
+        :return: 匹配的数据库记录；不存在时返回 None。
+        """
+        statement = select(UserMemoryRecord).where(
+            UserMemoryRecord.user_id == user_id,
+            UserMemoryRecord.memory_type == memory_type,
+            UserMemoryRecord.memory_key == memory_key,
+            UserMemoryRecord.status == "active",
+        )
+        return await self._session.scalar(statement)
     
 
     @staticmethod

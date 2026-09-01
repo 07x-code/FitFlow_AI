@@ -3,6 +3,8 @@ import {
   CalendarDays,
   Clock3,
   Dumbbell,
+  FilePenLine,
+  ListChecks,
   Plus,
   RefreshCw,
   ShieldCheck,
@@ -14,8 +16,12 @@ import {
   FitFlowApiError,
   fitFlowApi,
   type TrainingPlanHistoryItem,
+  type TrainingPlanProposalResponse,
   type TrainingPlanStatus,
+  type WorkoutSessionResponse,
 } from '../api/client';
+import { TrainingCalendar } from '../components/training-calendar';
+import { PlanEditor } from '../components/plan-editor';
 import { Button, Card, Chip, PageHeader } from '../components/ui';
 import {
   translateDayName,
@@ -24,6 +30,11 @@ import {
 } from '../utils/plan-labels';
 
 const USER_ID = 'demo-user';
+
+type EditingTarget = {
+  planId: number;
+  dayIndex?: number;
+};
 
 const statusLabels: Record<TrainingPlanStatus, string> = {
   scheduled: '待开始',
@@ -42,7 +53,7 @@ function formatDate(value: string) {
 
 function describeError(error: unknown) {
   if (error instanceof FitFlowApiError) {
-    return `读取训练计划失败，FastAPI 返回 ${error.status}。`;
+    return `读取训练数据失败，FastAPI 返回 ${error.status}。`;
   }
 
   return '无法连接 FastAPI，请确认后端已在 127.0.0.1:8000 启动。';
@@ -51,16 +62,26 @@ function describeError(error: unknown) {
 export function PlansPage() {
   const navigate = useNavigate();
   const [plans, setPlans] = useState<TrainingPlanHistoryItem[]>([]);
+  const [proposals, setProposals] = useState<TrainingPlanProposalResponse[]>([]);
+  const [sessions, setSessions] = useState<WorkoutSessionResponse[]>([]);
+  const [editingTarget, setEditingTarget] = useState<EditingTarget | null>(null);
+  const [activeView, setActiveView] = useState<'plan' | 'calendar'>('plan');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const loadPlans = async () => {
+  const loadTrainingData = async () => {
     setLoading(true);
     setError(null);
 
     try {
-      const response = await fitFlowApi.listTrainingPlans(USER_ID);
-      setPlans(response.plans);
+      const [planResponse, workoutResponse, proposalResponse] = await Promise.all([
+        fitFlowApi.listTrainingPlans(USER_ID),
+        fitFlowApi.listWorkoutHistory(USER_ID),
+        fitFlowApi.listTrainingPlanProposals(USER_ID),
+      ]);
+      setPlans(planResponse.plans);
+      setSessions(workoutResponse.sessions);
+      setProposals(proposalResponse.proposals);
     } catch (requestError) {
       setError(describeError(requestError));
     } finally {
@@ -69,32 +90,74 @@ export function PlansPage() {
   };
 
   useEffect(() => {
-    void loadPlans();
+    void loadTrainingData();
   }, []);
 
   const currentPlan =
     plans.find((plan) => plan.status === 'active') ??
     plans.find((plan) => plan.status === 'scheduled') ??
     plans[0];
+  const pendingReplacement = currentPlan
+    ? proposals.find(
+        (proposal) =>
+          proposal.status === 'pending' &&
+          proposal.operation === 'replace' &&
+          proposal.base_plan_id === currentPlan.id,
+      )
+    : undefined;
+  const editingPlan = editingTarget
+    ? plans.find((plan) => plan.id === editingTarget.planId)
+    : undefined;
+  const editingProposal = editingPlan
+    ? proposals.find(
+        (proposal) =>
+          proposal.status === 'pending' &&
+          proposal.operation === 'replace' &&
+          proposal.base_plan_id === editingPlan.id,
+      )
+    : undefined;
 
   return (
     <div className="page">
       <PageHeader
         action={
           <Button
-            icon={currentPlan ? RefreshCw : Plus}
+            icon={activeView === 'calendar' || currentPlan ? RefreshCw : Plus}
             onClick={
-              currentPlan
-                ? () => void loadPlans()
+              activeView === 'calendar' || currentPlan
+                ? () => void loadTrainingData()
                 : () => navigate('/app/coach')
             }
             variant="secondary">
-            {currentPlan ? '刷新计划' : '制定计划'}
+            {activeView === 'calendar' || currentPlan
+              ? '刷新数据'
+              : '制定计划'}
           </Button>
         }
-        eyebrow="PostgreSQL 正式计划"
-        title="训练计划"
+        eyebrow="计划与训练记录"
+        title="训练"
       />
+
+      <div aria-label="训练页面视图" className="training-view-tabs" role="tablist">
+        <button
+          aria-selected={activeView === 'plan'}
+          className={activeView === 'plan' ? 'is-active' : ''}
+          onClick={() => setActiveView('plan')}
+          role="tab"
+          type="button">
+          <ListChecks size={17} />
+          当前计划
+        </button>
+        <button
+          aria-selected={activeView === 'calendar'}
+          className={activeView === 'calendar' ? 'is-active' : ''}
+          onClick={() => setActiveView('calendar')}
+          role="tab"
+          type="button">
+          <CalendarDays size={17} />
+          训练日历
+        </button>
+      </div>
 
       {loading ? (
         <Card className="plan-state-card">
@@ -112,13 +175,13 @@ export function PlansPage() {
             <h2>训练计划暂时不可用</h2>
             <p>{error}</p>
           </div>
-          <Button icon={RefreshCw} onClick={() => void loadPlans()}>
+          <Button icon={RefreshCw} onClick={() => void loadTrainingData()}>
             重试
           </Button>
         </Card>
       ) : null}
 
-      {!loading && !error && !currentPlan ? (
+      {!loading && !error && activeView === 'plan' && !currentPlan ? (
         <Card className="plan-empty-card">
           <span className="colored-icon">
             <CalendarDays size={22} />
@@ -131,7 +194,7 @@ export function PlansPage() {
         </Card>
       ) : null}
 
-      {currentPlan ? (
+      {activeView === 'plan' && currentPlan ? (
         <>
           <Card className="plan-overview">
             <div>
@@ -157,6 +220,17 @@ export function PlansPage() {
                 tone={currentPlan.status === 'completed' ? 'green' : 'blue'}>
                 {statusLabels[currentPlan.status]}
               </Chip>
+              {currentPlan.status === 'active' ||
+              currentPlan.status === 'scheduled' ? (
+                <Button
+                  icon={pendingReplacement ? ShieldCheck : FilePenLine}
+                  onClick={() =>
+                    setEditingTarget({ planId: currentPlan.id })
+                  }
+                  variant={pendingReplacement ? 'primary' : 'secondary'}>
+                  {pendingReplacement ? '确认修改' : '编辑计划'}
+                </Button>
+              ) : null}
             </div>
           </Card>
 
@@ -223,6 +297,27 @@ export function PlansPage() {
             </aside>
           </div>
         </>
+      ) : null}
+
+      {!loading && !error && activeView === 'calendar' ? (
+        <TrainingCalendar
+          onEditPlannedWorkout={(planId, dayIndex) =>
+            setEditingTarget({ planId, dayIndex })
+          }
+          plans={plans}
+          sessions={sessions}
+        />
+      ) : null}
+
+      {editingTarget && editingPlan ? (
+        <PlanEditor
+          initialDayIndex={editingTarget.dayIndex}
+          onChanged={() => void loadTrainingData()}
+          onClose={() => setEditingTarget(null)}
+          pendingProposal={editingProposal}
+          plan={editingPlan}
+          userId={USER_ID}
+        />
       ) : null}
     </div>
   );

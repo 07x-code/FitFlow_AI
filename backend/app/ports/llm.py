@@ -40,6 +40,7 @@ class LLMToolDefinition:
     name: str
     description: str
     parameters: dict[str, Any]
+    force_call: bool = False
 
 
 @dataclass(frozen=True)

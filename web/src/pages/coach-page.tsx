@@ -281,7 +281,10 @@ export function CoachPage() {
     setIsPlanning(true);
 
     try {
-      const created = await fitFlowApi.createTrainingPlanProposal(USER_ID);
+      const created = await fitFlowApi.createTrainingPlanProposal(
+        USER_ID,
+        requestText,
+      );
       setProposal(created);
       setMessages((current) => [
         ...current,
@@ -739,6 +742,13 @@ function ProposalCard({
 }
 
 function ResponseEvidence({ response }: { response: CoachChatResponse }) {
+  const [deletedMemoryIds, setDeletedMemoryIds] = useState<number[]>([]);
+
+  const deleteMemory = async (memoryId: number) => {
+    await fitFlowApi.deleteMemory(USER_ID, memoryId);
+    setDeletedMemoryIds((current) => [...current, memoryId]);
+  };
+
   return (
     <div className="response-evidence">
       <div className="response-meta">
@@ -749,6 +759,33 @@ function ResponseEvidence({ response }: { response: CoachChatResponse }) {
           <span>引用计划 #{response.referenced_plan_id}</span>
         ) : null}
       </div>
+
+      {response.memory_events.length > 0 ? (
+        <div className="memory-events">
+          {response.memory_events.map((event) => {
+            const deleted = deletedMemoryIds.includes(event.memory_id);
+            return (
+              <div key={`${event.action}-${event.memory_id}`}>
+                <CheckCircle2 size={15} />
+                <span>
+                  {deleted
+                    ? '这条长期记忆已删除'
+                    : event.action === 'remembered'
+                      ? `已记住：${event.content}`
+                      : event.content}
+                </span>
+                {event.action === 'remembered' && !deleted ? (
+                  <button
+                    onClick={() => void deleteMemory(event.memory_id)}
+                    type="button">
+                    删除
+                  </button>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
 
       {response.knowledge_sources.length > 0 ? (
         <div className="knowledge-sources">

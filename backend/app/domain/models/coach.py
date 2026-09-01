@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -28,6 +30,15 @@ class CoachChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=1000)
 
 
+class MemoryMutationEvent(BaseModel):
+    """本轮对话实际执行的长期记忆变更。"""
+
+    action: Literal["remembered", "forgotten"]
+    memory_id: int
+    type: str
+    content: str
+
+
 class CoachChatResponse(BaseModel):
     """AI 教练对话响应。"""
 
@@ -35,3 +46,4 @@ class CoachChatResponse(BaseModel):
     safety_level: str
     referenced_plan_id: int | None = None
     knowledge_sources: list[KnowledgeSource] = Field(default_factory=list)
+    memory_events: list[MemoryMutationEvent] = Field(default_factory=list)

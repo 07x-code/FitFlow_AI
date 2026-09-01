@@ -149,6 +149,16 @@ class UserMemoryRecord(Base):
             "status",
             "id",
         ),
+        Index(
+            "uq_user_memories_active_key",
+            "user_id",
+            "memory_type",
+            "memory_key",
+            unique=True,
+            postgresql_where=text(
+                "status = 'active' AND memory_key IS NOT NULL"
+            ),
+        ),
     )
 
     id: Mapped[int] = mapped_column(
@@ -167,6 +177,10 @@ class UserMemoryRecord(Base):
     content: Mapped[str] = mapped_column(
         Text,
         nullable=False,
+    )
+    memory_key: Mapped[str | None] = mapped_column(
+        String(160),
+        nullable=True,
     )
     source: Mapped[str] = mapped_column(
         String(32),

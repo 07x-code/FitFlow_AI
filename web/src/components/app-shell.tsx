@@ -15,7 +15,7 @@ import { PwaPrompt } from './pwa-prompt';
 
 const navigation = [
   { to: '/app', label: '首页', icon: Home, end: true },
-  { to: '/app/plans', label: '计划', icon: Dumbbell, end: false },
+  { to: '/app/plans', label: '训练', icon: Dumbbell, end: false },
   { to: '/app/coach', label: 'AI 教练', icon: Bot, end: false },
   { to: '/app/exercises', label: '动作', icon: Activity, end: false },
   { to: '/app/profile', label: '我的', icon: UserRound, end: false },
