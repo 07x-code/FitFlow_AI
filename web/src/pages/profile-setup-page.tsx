@@ -18,10 +18,10 @@ export function ProfileSetupPage() {
   const [goal, setGoal] = useState('增肌');
   const [frequency, setFrequency] = useState('每周 3 天');
   const [sex, setSex] = useState<'male' | 'female'>('male');
-  const [age, setAge] = useState(28);
-  const [height, setHeight] = useState(175);
-  const [weight, setWeight] = useState(70);
-  const [minutes, setMinutes] = useState(60);
+  const [age, setAge] = useState('28');
+  const [height, setHeight] = useState('175');
+  const [weight, setWeight] = useState('70');
+  const [minutes, setMinutes] = useState('60');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const { user } = useAuth();
@@ -95,7 +95,9 @@ export function ProfileSetupPage() {
                   <input
                     max="80"
                     min="16"
-                    onChange={(event) => setAge(Number(event.target.value))}
+                    inputMode="numeric"
+                    onChange={(event) => setAge(event.target.value)}
+                    onFocus={(event) => event.currentTarget.select()}
                     type="number"
                     value={age}
                   />
@@ -118,7 +120,9 @@ export function ProfileSetupPage() {
                   <input
                     max="230"
                     min="120"
-                    onChange={(event) => setHeight(Number(event.target.value))}
+                    inputMode="numeric"
+                    onChange={(event) => setHeight(event.target.value)}
+                    onFocus={(event) => event.currentTarget.select()}
                     type="number"
                     value={height}
                   />
@@ -131,7 +135,9 @@ export function ProfileSetupPage() {
                   <input
                     max="250"
                     min="35"
-                    onChange={(event) => setWeight(Number(event.target.value))}
+                    inputMode="decimal"
+                    onChange={(event) => setWeight(event.target.value)}
+                    onFocus={(event) => event.currentTarget.select()}
                     step="0.1"
                     type="number"
                     value={weight}
@@ -149,7 +155,9 @@ export function ProfileSetupPage() {
                 <input
                   max="120"
                   min="30"
-                  onChange={(event) => setMinutes(Number(event.target.value))}
+                  inputMode="numeric"
+                  onChange={(event) => setMinutes(event.target.value)}
+                  onFocus={(event) => event.currentTarget.select()}
                   step="5"
                   type="number"
                   value={minutes}
@@ -193,16 +201,43 @@ export function ProfileSetupPage() {
             fullWidth
             icon={ArrowRight}
             onClick={() => {
-              setBusy(true);
               setError('');
+              if (!age || !height || !weight || !minutes) {
+                setError('请完整填写年龄、身高、体重和单次训练时长。');
+                return;
+              }
+
+              const ageValue = Number(age);
+              const heightValue = Number(height);
+              const weightValue = Number(weight);
+              const minutesValue = Number(minutes);
+
+              if (!Number.isInteger(ageValue) || ageValue < 16 || ageValue > 80) {
+                setError('年龄应为 16 至 80 岁之间的整数。');
+                return;
+              }
+              if (!Number.isInteger(heightValue) || heightValue < 120 || heightValue > 230) {
+                setError('身高应为 120 至 230 厘米之间的整数。');
+                return;
+              }
+              if (!Number.isFinite(weightValue) || weightValue < 35 || weightValue > 250) {
+                setError('体重应在 35 至 250 千克之间。');
+                return;
+              }
+              if (!Number.isInteger(minutesValue) || minutesValue < 30 || minutesValue > 120) {
+                setError('单次训练时长应为 30 至 120 分钟之间的整数。');
+                return;
+              }
+
+              setBusy(true);
               void fitFlowApi.createProfile({
-                age,
+                age: ageValue,
                 sex,
-                height_cm: height,
-                weight_kg: weight,
+                height_cm: heightValue,
+                weight_kg: weightValue,
                 goal: goalValues[goal as keyof typeof goalValues],
                 sessions_per_week: Number(frequency.match(/\d/)?.[0] ?? 3),
-                session_minutes: minutes,
+                session_minutes: minutesValue,
                 health_flags: [],
               })
                 .then(() => navigate('/app/coach'))
