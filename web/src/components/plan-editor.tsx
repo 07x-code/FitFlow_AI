@@ -28,7 +28,6 @@ import { Button, Chip } from './ui';
 
 type PlanEditorProps = {
   plan: TrainingPlanHistoryItem;
-  userId: string;
   initialDayIndex?: number;
   pendingProposal?: TrainingPlanProposalResponse;
   onClose: () => void;
@@ -59,7 +58,6 @@ function clonePlan(plan: TrainingPlanDraft): TrainingPlanDraft {
 
 export function PlanEditor({
   plan,
-  userId,
   initialDayIndex,
   pendingProposal,
   onClose,
@@ -129,7 +127,6 @@ export function PlanEditor({
     setError('');
     try {
       const created = await fitFlowApi.createManualTrainingPlanProposal(
-        userId,
         plan.id,
         draft,
       );
@@ -147,7 +144,6 @@ export function PlanEditor({
     setError('');
     try {
       await fitFlowApi.decideTrainingPlanProposal(
-        userId,
         proposal.id,
         decision,
       );

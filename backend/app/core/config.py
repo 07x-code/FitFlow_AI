@@ -67,6 +67,10 @@ class AppSettings:
     redis_url: str = "redis://127.0.0.1:6379/0"
     working_memory_ttl_seconds: int = 7200
     working_memory_capacity: int = 40
+    session_backend: str = "redis"
+    session_ttl_seconds: int = 604800
+    session_cookie_name: str = "fitflow_session"
+    session_cookie_secure: bool = False
 
     @classmethod
     def from_env(cls) -> "AppSettings":
@@ -126,6 +130,23 @@ class AppSettings:
             working_memory_capacity=_read_positive_int(
                 "FITFLOW_WORKING_MEMORY_CAPACITY",
                 default=40,
+            ),
+            session_backend=_read_choice(
+                "FITFLOW_SESSION_BACKEND",
+                choices={"memory", "redis"},
+                default="redis",
+            ),
+            session_ttl_seconds=_read_positive_int(
+                "FITFLOW_SESSION_TTL_SECONDS",
+                default=604800,
+            ),
+            session_cookie_name=_read_env(
+                "FITFLOW_SESSION_COOKIE_NAME",
+                default="fitflow_session",
+            ),
+            session_cookie_secure=_read_bool(
+                "FITFLOW_SESSION_COOKIE_SECURE",
+                default=False,
             ),
         )
 
@@ -192,3 +213,45 @@ def _read_positive_int(name: str, *, default: int) -> int:
     if value < 1:
         raise ValueError(f"{name} must be a positive integer")
     return value
+
+
+def _read_bool(name: str, *, default: bool) -> bool:
+    """
+    读取布尔型环境变量。
+
+    :param name: 环境变量名称。
+    :param default: 环境变量缺失时使用的默认值。
+    :return: 解析后的布尔值。
+    """
+    raw_value = _read_env(name)
+    if raw_value is None:
+        return default
+
+    normalized = raw_value.casefold()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    raise ValueError(f"{name} must be a boolean")
+
+
+def _read_choice(
+    name: str,
+    *,
+    choices: set[str],
+    default: str,
+) -> str:
+    """
+    读取限定候选值的环境变量。
+
+    :param name: 环境变量名称。
+    :param choices: 允许使用的候选值集合。
+    :param default: 环境变量缺失时使用的默认值。
+    :return: 规范化后的候选值。
+    """
+    value = _read_env(name, default=default)
+    normalized = value.casefold() if value is not None else default
+    if normalized not in choices:
+        allowed = ", ".join(sorted(choices))
+        raise ValueError(f"{name} must be one of: {allowed}")
+    return normalized

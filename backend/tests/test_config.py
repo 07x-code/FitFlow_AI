@@ -121,3 +121,40 @@ def test_settings_rejects_empty_test_database_url(monkeypatch):
 
     with pytest.raises(ValueError, match="FITFLOW_TEST_DATABASE_URL"):
         AppSettings.from_env()
+
+
+def test_settings_reads_session_security_options(monkeypatch):
+    """
+    验证应用配置能够读取登录会话安全参数。
+
+    :param monkeypatch: Pytest 提供的环境变量替换工具。
+    :return: 无返回值。
+    """
+    monkeypatch.setenv("FITFLOW_SESSION_BACKEND", "redis")
+    monkeypatch.setenv("FITFLOW_SESSION_TTL_SECONDS", "3600")
+    monkeypatch.setenv("FITFLOW_SESSION_COOKIE_NAME", "fitflow_test_session")
+    monkeypatch.setenv("FITFLOW_SESSION_COOKIE_SECURE", "true")
+
+    settings = AppSettings.from_env()
+
+    assert settings.session_backend == "redis"
+    assert settings.session_ttl_seconds == 3600
+    assert settings.session_cookie_name == "fitflow_test_session"
+    assert settings.session_cookie_secure is True
+
+
+def test_settings_rejects_invalid_session_options(monkeypatch):
+    """
+    验证应用拒绝无效的登录会话配置。
+
+    :param monkeypatch: Pytest 提供的环境变量替换工具。
+    :return: 无返回值。
+    """
+    monkeypatch.setenv("FITFLOW_SESSION_BACKEND", "file")
+    with pytest.raises(ValueError, match="FITFLOW_SESSION_BACKEND"):
+        AppSettings.from_env()
+
+    monkeypatch.setenv("FITFLOW_SESSION_BACKEND", "memory")
+    monkeypatch.setenv("FITFLOW_SESSION_COOKIE_SECURE", "sometimes")
+    with pytest.raises(ValueError, match="FITFLOW_SESSION_COOKIE_SECURE"):
+        AppSettings.from_env()

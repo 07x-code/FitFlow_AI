@@ -9,7 +9,6 @@ let coachCleanupRegistered = false;
 
 type RequestOptions = {
   method?: 'GET' | 'POST' | 'DELETE';
-  userId?: string;
   sessionId?: string;
   body?: unknown;
   keepalive?: boolean;
@@ -27,6 +26,21 @@ export type CoachChatResponse = {
   referenced_plan_id: number | null;
   knowledge_sources: KnowledgeSource[];
   memory_events: MemoryMutationEvent[];
+};
+
+export type UserAccount = {
+  id: string;
+  email: string;
+  display_name: string;
+  status: 'active' | 'disabled';
+  email_verified_at: string | null;
+  created_at: string;
+  updated_at: string;
+  last_login_at: string | null;
+};
+
+export type AuthenticationResponse = {
+  user: UserAccount;
 };
 
 export type MemoryMutationEvent = {
@@ -167,7 +181,6 @@ async function request<T>(
   path: string,
   {
     method = 'GET',
-    userId,
     sessionId,
     body,
     keepalive = false,
@@ -175,10 +188,10 @@ async function request<T>(
 ): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method,
+    credentials: 'include',
     headers: {
       Accept: 'application/json',
       ...(body ? { 'Content-Type': 'application/json' } : {}),
-      ...(userId ? { 'X-User-ID': userId } : {}),
       ...(sessionId ? { 'X-Session-ID': sessionId } : {}),
     },
     body: body ? JSON.stringify(body) : undefined,
@@ -186,6 +199,9 @@ async function request<T>(
   });
 
   if (!response.ok) {
+    if (response.status === 401 && !path.startsWith('/api/auth/')) {
+      window.dispatchEvent(new Event('fitflow:unauthorized'));
+    }
     const payload: unknown = await response.json().catch(() => null);
     const detail =
       payload && typeof payload === 'object' && 'detail' in payload
@@ -208,9 +224,8 @@ async function request<T>(
 /**
  * 首次发起教练对话时注册页面结束清理，避免重复监听。
  *
- * @param userId 当前用户标识。
  */
-function ensureCoachSessionCleanup(userId: string) {
+function ensureCoachSessionCleanup() {
   if (coachCleanupRegistered || typeof window === 'undefined') {
     return;
   }
@@ -223,7 +238,6 @@ function ensureCoachSessionCleanup(userId: string) {
         `/api/memories/working/${COACH_SESSION_ID}`,
         {
           method: 'DELETE',
-          userId,
           keepalive: true,
         },
       ).catch(() => undefined);
@@ -234,24 +248,31 @@ function ensureCoachSessionCleanup(userId: string) {
 
 export const fitFlowApi = {
   health: () => request<{ service: string; status: string }>('/health'),
-  getProfile: (userId: string) =>
-    request('/api/profiles/me', { userId }),
-  createProfile: (userId: string, profile: unknown) =>
-    request('/api/profiles', { method: 'POST', userId, body: profile }),
-  listTrainingPlans: (userId: string) =>
-    request<TrainingPlanHistoryResponse>('/api/training-plans/history', {
-      userId,
+  register: (email: string, password: string, displayName: string) =>
+    request<AuthenticationResponse>('/api/auth/register', {
+      method: 'POST',
+      body: { email, password, display_name: displayName },
     }),
-  listWorkoutHistory: (userId: string) =>
-    request<WorkoutHistoryResponse>('/api/workouts/history', { userId }),
-  createTrainingPlanProposal: (userId: string, message?: string) =>
+  login: (email: string, password: string) =>
+    request<AuthenticationResponse>('/api/auth/login', {
+      method: 'POST',
+      body: { email, password },
+    }),
+  logout: () => request<void>('/api/auth/logout', { method: 'POST' }),
+  getCurrentUser: () => request<UserAccount>('/api/auth/me'),
+  getProfile: () => request('/api/profiles/me'),
+  createProfile: (profile: unknown) =>
+    request('/api/profiles', { method: 'POST', body: profile }),
+  listTrainingPlans: () =>
+    request<TrainingPlanHistoryResponse>('/api/training-plans/history'),
+  listWorkoutHistory: () =>
+    request<WorkoutHistoryResponse>('/api/workouts/history'),
+  createTrainingPlanProposal: (message?: string) =>
     request<TrainingPlanProposalResponse>('/api/proposals/training-plan', {
       method: 'POST',
-      userId,
       body: message ? { message } : undefined,
     }),
   createManualTrainingPlanProposal: (
-    userId: string,
     basePlanId: number,
     plan: TrainingPlanDraft,
   ) =>
@@ -259,14 +280,12 @@ export const fitFlowApi = {
       '/api/proposals/training-plan/manual-replacement',
       {
         method: 'POST',
-        userId,
         body: { base_plan_id: basePlanId, plan },
       },
     ),
-  listTrainingPlanProposals: (userId: string) =>
-    request<ProposalListResponse>('/api/proposals', { userId }),
+  listTrainingPlanProposals: () =>
+    request<ProposalListResponse>('/api/proposals'),
   decideTrainingPlanProposal: (
-    userId: string,
     proposalId: number,
     decision: ProposalDecision,
   ) =>
@@ -274,12 +293,10 @@ export const fitFlowApi = {
       `/api/proposals/${proposalId}/decision`,
       {
         method: 'POST',
-        userId,
         body: { decision },
       },
     ),
   reviseTrainingPlanProposal: (
-    userId: string,
     proposalId: number,
     feedback: string,
   ) =>
@@ -287,30 +304,26 @@ export const fitFlowApi = {
       `/api/proposals/${proposalId}/revisions`,
       {
         method: 'POST',
-        userId,
         body: { feedback },
       },
     ),
-  chatWithCoach: (userId: string, message: string) => {
-    ensureCoachSessionCleanup(userId);
+  chatWithCoach: (message: string) => {
+    ensureCoachSessionCleanup();
     return request<CoachChatResponse>('/api/coach/chat', {
       method: 'POST',
-      userId,
       sessionId: COACH_SESSION_ID,
       body: { message },
     });
   },
-  endCoachSession: (userId: string, keepalive = false) =>
+  endCoachSession: (keepalive = false) =>
     request<void>(`/api/memories/working/${COACH_SESSION_ID}`, {
       method: 'DELETE',
-      userId,
       keepalive,
     }),
-  deleteMemory: (userId: string, memoryId: number) =>
+  deleteMemory: (memoryId: number) =>
     request<void>(`/api/memories/${memoryId}`, {
       method: 'DELETE',
-      userId,
     }),
-  createWeeklyReport: (userId: string) =>
-    request('/api/reports/weekly', { method: 'POST', userId }),
+  createWeeklyReport: () =>
+    request('/api/reports/weekly', { method: 'POST' }),
 };

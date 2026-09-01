@@ -43,6 +43,13 @@ from app.domain.models.proposal import (
     TrainingPlanProposalResponse,
 )
 from app.domain.models.report import WeeklyReportMetrics, WeeklyReportResponse
+from app.domain.models.user import (
+    AuthenticationResponse,
+    UserAccount,
+    UserLoginRequest,
+    UserRegistrationRequest,
+    UserStatus,
+)
 from app.domain.models.user_memory import (
     MemoryCandidate,
     MemoryCommand,
@@ -69,6 +76,7 @@ from app.domain.models.workout import (
 __all__ = [
     "CoachChatRequest",
     "CoachChatResponse",
+    "AuthenticationResponse",
     "ConversationRole",
     "ExercisePrescription",
     "FitnessGoal",
@@ -101,9 +109,13 @@ __all__ = [
     "TrainingPlanHistoryResponse",
     "TrainingPlanProposalCreateRequest",
     "TrainingPlanProposalResponse",
+    "UserAccount",
+    "UserLoginRequest",
     "UserMemoryCreate",
     "UserMemoryListResponse",
     "UserMemoryResponse",
+    "UserStatus",
+    "UserRegistrationRequest",
     "WeeklyReportMetrics",
     "WeeklyReportResponse",
     "WorkingMemoryItem",

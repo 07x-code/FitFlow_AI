@@ -6,6 +6,7 @@ from app.application.errors import (
     ConflictError,
     InvalidRequestError,
     NotFoundError,
+    UnauthorizedError,
     UnprocessableError,
 )
 
@@ -15,6 +16,7 @@ ERROR_STATUS_CODES: dict[type[ApplicationError], int] = {
     ConflictError: status.HTTP_409_CONFLICT,
     InvalidRequestError: status.HTTP_400_BAD_REQUEST,
     UnprocessableError: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    UnauthorizedError: status.HTTP_401_UNAUTHORIZED,
 }
 
 

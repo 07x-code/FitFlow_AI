@@ -12,6 +12,7 @@ import {
 import { Link, useNavigate } from 'react-router';
 
 import { Card, Chip, PageHeader, ProgressBar } from '../components/ui';
+import { useAuth } from '../auth';
 
 const settings = [
   { icon: UserRound, label: '训练画像', value: '增肌', tone: 'green' },
@@ -23,6 +24,8 @@ const settings = [
 
 export function ProfilePage() {
   const navigate = useNavigate();
+  const { user, logout } = useAuth();
+  const avatarText = user?.display_name.trim().charAt(0).toUpperCase() || 'U';
 
   return (
     <div className="page page--profile">
@@ -38,13 +41,13 @@ export function ProfilePage() {
       <div className="profile-grid">
         <section>
           <div className="profile-identity">
-            <span className="profile-avatar">A</span>
+            <span className="profile-avatar">{avatarText}</span>
             <div>
               <span>
-                <h2>Alex</h2>
+                <h2>{user?.display_name}</h2>
                 <Chip tone="blue">第 4 周</Chip>
               </span>
-              <p>目标：增加肌肉与基础力量</p>
+              <p>{user?.email}</p>
             </div>
           </div>
 
@@ -105,7 +108,12 @@ export function ProfilePage() {
         </Card>
       </div>
 
-      <button className="logout-button" onClick={() => navigate('/')} type="button">
+      <button
+        className="logout-button"
+        onClick={() => {
+          void logout().then(() => navigate('/', { replace: true }));
+        }}
+        type="button">
         <LogOut size={18} />
         退出登录
       </button>

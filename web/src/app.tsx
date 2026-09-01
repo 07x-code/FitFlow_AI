@@ -1,11 +1,13 @@
 import { Navigate, Route, Routes } from 'react-router';
 
 import { AppShell } from './components/app-shell';
+import { RequireAuth } from './auth';
 import { CoachPage } from './pages/coach-page';
 import { DashboardPage } from './pages/dashboard-page';
 import { ExercisePage } from './pages/exercise-page';
 import { ExerciseLibraryPage } from './pages/exercise-library-page';
 import { LoginPage } from './pages/login-page';
+import { RegisterPage } from './pages/register-page';
 import { PlanDetailPage } from './pages/plan-detail-page';
 import { PlansPage } from './pages/plans-page';
 import { ProfilePage } from './pages/profile-page';
@@ -16,8 +18,22 @@ export function App() {
   return (
     <Routes>
       <Route element={<LoginPage />} path="/" />
-      <Route element={<ProfileSetupPage />} path="/profile-setup" />
-      <Route element={<AppShell />} path="/app">
+      <Route element={<RegisterPage />} path="/register" />
+      <Route
+        element={
+          <RequireAuth>
+            <ProfileSetupPage />
+          </RequireAuth>
+        }
+        path="/profile-setup"
+      />
+      <Route
+        element={
+          <RequireAuth>
+            <AppShell />
+          </RequireAuth>
+        }
+        path="/app">
         <Route element={<DashboardPage />} index />
         <Route element={<PlansPage />} path="plans" />
         <Route element={<PlanDetailPage />} path="plans/:planId" />

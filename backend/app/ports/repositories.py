@@ -6,12 +6,88 @@ from app.domain.models import (
     TrainingPlanDraft,
     TrainingPlanHistoryItem,
     TrainingPlanProposalResponse,
+    UserAccount,
     UserMemoryCreate,
     UserMemoryResponse,
     WorkoutSafetyAlert,
     WorkoutSessionCreate,
     WorkoutSessionResponse,
 )
+
+
+UserAuthentication = tuple[UserAccount, str]
+
+
+class DuplicateEmailError(Exception):
+    """用户邮箱已经存在。"""
+
+
+class UserRepositoryPort(Protocol):
+    """用户账号持久化端口。"""
+
+    async def create(
+        self,
+        email: str,
+        password_hash: str,
+        display_name: str,
+    ) -> UserAccount:
+        """
+        创建用户账号。
+
+        :param email: 用户邮箱。
+        :param password_hash: Argon2id 密码哈希。
+        :param display_name: 用户显示名称。
+        :return: 已创建的安全用户账号。
+        """
+        ...
+
+    async def get_by_id(self, user_id: str) -> UserAccount | None:
+        """
+        按用户标识查询账号。
+
+        :param user_id: 用户标识。
+        :return: 用户账号；不存在时返回 None。
+        """
+        ...
+
+    async def get_by_email(self, email: str) -> UserAccount | None:
+        """
+        按规范化邮箱查询账号。
+
+        :param email: 用户输入的邮箱。
+        :return: 用户账号；不存在时返回 None。
+        """
+        ...
+
+    async def get_authentication_by_email(
+        self,
+        email: str,
+    ) -> UserAuthentication | None:
+        """
+        查询登录验证需要的用户账号和密码哈希。
+
+        :param email: 用户输入的邮箱。
+        :return: 用户账号与密码哈希；不存在时返回 None。
+        """
+        ...
+
+    async def mark_login(self, user_id: str) -> UserAccount | None:
+        """
+        记录用户最近登录时间。
+
+        :param user_id: 用户标识。
+        :return: 更新后的用户账号；不存在时返回 None。
+        """
+        ...
+
+    async def disable(self, user_id: str) -> UserAccount | None:
+        """
+        禁用用户账号。
+
+        :param user_id: 用户标识。
+        :return: 更新后的用户账号；不存在时返回 None。
+        """
+        ...
 
 
 class ProfileRepositoryPort(Protocol):

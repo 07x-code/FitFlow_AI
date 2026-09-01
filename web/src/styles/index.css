@@ -535,6 +535,25 @@ button.chip {
   background: transparent;
 }
 
+.auth-form__error {
+  padding: 0.8rem 0.9rem;
+  color: #b42318;
+  border: 1px solid rgba(180, 35, 24, 0.2);
+  border-radius: 12px;
+  background: rgba(254, 228, 226, 0.72);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.auth-loading {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  color: var(--muted);
+  background: var(--background);
+  font-weight: 700;
+}
+
 .auth-benefits {
   display: flex;
   margin-top: 1.2rem;
@@ -712,6 +731,25 @@ button.chip {
   color: var(--muted);
   font-size: 0.75rem;
   font-style: normal;
+}
+
+.profile-select {
+  width: 100%;
+  min-height: 52px;
+  padding: 0 0.9rem;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  outline: 0;
+  background: var(--card-raised);
+  font: inherit;
+}
+
+.setup-account-note {
+  margin-top: 1rem;
+  color: var(--muted);
+  text-align: center;
+  font-size: 0.78rem;
 }
 
 .health-field {

@@ -1,8 +1,9 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, status
+from fastapi import APIRouter, Depends, status
 
 from app.api.dependencies import (
+    get_current_user_id,
     get_memory_use_cases,
     get_working_memory_use_cases,
 )
@@ -21,7 +22,7 @@ router = APIRouter(prefix="/api/memories", tags=["memories"])
 @router.post("", response_model=UserMemoryResponse, status_code=status.HTTP_201_CREATED)
 async def create_memory(
     memory: UserMemoryCreate,
-    user_id: Annotated[str, Header(alias="X-User-ID")],
+    user_id: Annotated[str, Depends(get_current_user_id)],
     use_cases: Annotated[MemoryUseCases, Depends(get_memory_use_cases)],
 ) -> UserMemoryResponse:
     """
@@ -37,7 +38,7 @@ async def create_memory(
 
 @router.get("", response_model=UserMemoryListResponse)
 async def list_memories(
-    user_id: Annotated[str, Header(alias="X-User-ID")],
+    user_id: Annotated[str, Depends(get_current_user_id)],
     use_cases: Annotated[MemoryUseCases, Depends(get_memory_use_cases)],
 ) -> UserMemoryListResponse:
     """
@@ -56,7 +57,7 @@ async def list_memories(
 )
 def list_working_memory(
     session_id: str,
-    user_id: Annotated[str, Header(alias="X-User-ID")],
+    user_id: Annotated[str, Depends(get_current_user_id)],
     use_cases: Annotated[
         WorkingMemoryUseCases,
         Depends(get_working_memory_use_cases),
@@ -79,7 +80,7 @@ def list_working_memory(
 )
 def end_working_memory_session(
     session_id: str,
-    user_id: Annotated[str, Header(alias="X-User-ID")],
+    user_id: Annotated[str, Depends(get_current_user_id)],
     use_cases: Annotated[
         WorkingMemoryUseCases,
         Depends(get_working_memory_use_cases),
@@ -99,7 +100,7 @@ def end_working_memory_session(
 @router.delete("/{memory_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_memory(
     memory_id: int,
-    user_id: Annotated[str, Header(alias="X-User-ID")],
+    user_id: Annotated[str, Depends(get_current_user_id)],
     use_cases: Annotated[MemoryUseCases, Depends(get_memory_use_cases)],
 ) -> None:
     """

@@ -12,6 +12,7 @@ import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router';
 
 import { PwaPrompt } from './pwa-prompt';
+import { useAuth } from '../auth';
 
 const navigation = [
   { to: '/app', label: '首页', icon: Home, end: true },
@@ -24,6 +25,8 @@ const navigation = [
 export function AppShell() {
   const [menuOpen, setMenuOpen] = useState(false);
   const navigate = useNavigate();
+  const { user, logout } = useAuth();
+  const avatarText = user?.display_name.trim().charAt(0).toUpperCase() || 'U';
 
   return (
     <div className="app-shell">
@@ -64,15 +67,17 @@ export function AppShell() {
         </nav>
 
         <div className="sidebar__profile">
-          <span className="avatar">A</span>
+          <span className="avatar">{avatarText}</span>
           <span>
-            <strong>Alex</strong>
-            <small>稳定训练者 · Lv.6</small>
+            <strong>{user?.display_name}</strong>
+            <small>{user?.email}</small>
           </span>
           <button
             aria-label="退出登录"
             className="icon-button"
-            onClick={() => navigate('/')}
+            onClick={() => {
+              void logout().then(() => navigate('/', { replace: true }));
+            }}
             type="button">
             <LogOut aria-hidden="true" size={18} />
           </button>
@@ -98,7 +103,7 @@ export function AppShell() {
             <Menu aria-hidden="true" size={21} />
           </button>
           <span className="mobile-topbar__title">FitFlow AI</span>
-          <span className="avatar avatar--small">A</span>
+          <span className="avatar avatar--small">{avatarText}</span>
         </div>
         <main className="app-main">
           <Outlet />

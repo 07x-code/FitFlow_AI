@@ -29,8 +29,6 @@ import {
   translatePlanText,
 } from '../utils/plan-labels';
 
-const USER_ID = 'demo-user';
-
 type EditingTarget = {
   planId: number;
   dayIndex?: number;
@@ -75,9 +73,9 @@ export function PlansPage() {
 
     try {
       const [planResponse, workoutResponse, proposalResponse] = await Promise.all([
-        fitFlowApi.listTrainingPlans(USER_ID),
-        fitFlowApi.listWorkoutHistory(USER_ID),
-        fitFlowApi.listTrainingPlanProposals(USER_ID),
+        fitFlowApi.listTrainingPlans(),
+        fitFlowApi.listWorkoutHistory(),
+        fitFlowApi.listTrainingPlanProposals(),
       ]);
       setPlans(planResponse.plans);
       setSessions(workoutResponse.sessions);
@@ -164,7 +162,7 @@ export function PlansPage() {
           <RefreshCw className="plan-state-card__spinner" size={24} />
           <div>
             <h2>正在读取训练计划</h2>
-            <p>从 FastAPI 加载用户 {USER_ID} 的正式计划。</p>
+            <p>正在从 FastAPI 加载当前账号的正式计划。</p>
           </div>
         </Card>
       ) : null}
@@ -316,7 +314,6 @@ export function PlansPage() {
           onClose={() => setEditingTarget(null)}
           pendingProposal={editingProposal}
           plan={editingPlan}
-          userId={USER_ID}
         />
       ) : null}
     </div>

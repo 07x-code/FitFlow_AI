@@ -23,6 +23,81 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.infrastructure.persistence.postgres.base import Base
 
 
+class UserRecord(Base):
+    """用户账号在 PostgreSQL 中的持久化记录。"""
+
+    __tablename__ = "users"
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('active', 'disabled')",
+            name="ck_users_status_allowed",
+        ),
+        CheckConstraint(
+            "char_length(trim(email)) BETWEEN 3 AND 320",
+            name="ck_users_email_length",
+        ),
+        CheckConstraint(
+            "char_length(trim(email_normalized)) BETWEEN 3 AND 320",
+            name="ck_users_normalized_email_length",
+        ),
+        CheckConstraint(
+            "char_length(trim(display_name)) BETWEEN 1 AND 100",
+            name="ck_users_display_name_length",
+        ),
+        UniqueConstraint(
+            "email_normalized",
+            name="uq_users_email_normalized",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(
+        String(128),
+        primary_key=True,
+    )
+    email: Mapped[str] = mapped_column(
+        String(320),
+        nullable=False,
+    )
+    email_normalized: Mapped[str] = mapped_column(
+        String(320),
+        nullable=False,
+    )
+    password_hash: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+    display_name: Mapped[str] = mapped_column(
+        String(100),
+        nullable=False,
+    )
+    status: Mapped[str] = mapped_column(
+        String(16),
+        nullable=False,
+        default="active",
+        server_default=text("'active'"),
+    )
+    email_verified_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+    last_login_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+
 class FitnessProfileRecord(Base):
     """用户健身画像在 PostgreSQL 中的持久化记录。"""
 

@@ -1,8 +1,8 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, status
+from fastapi import APIRouter, Depends, status
 
-from app.api.dependencies import get_profile_use_cases
+from app.api.dependencies import get_current_user_id, get_profile_use_cases
 from app.application.use_cases.profiles import ProfileUseCases
 from app.domain.models import FitnessProfileCreate, ProfileAssessmentResponse
 
@@ -13,7 +13,7 @@ router = APIRouter(prefix="/api/profiles", tags=["profiles"])
 @router.post("", response_model=ProfileAssessmentResponse, status_code=status.HTTP_201_CREATED)
 async def create_profile(
     profile: FitnessProfileCreate,
-    user_id: Annotated[str, Header(alias="X-User-ID")],
+    user_id: Annotated[str, Depends(get_current_user_id)],
     use_cases: Annotated[ProfileUseCases, Depends(get_profile_use_cases)],
 ) -> ProfileAssessmentResponse:
     """
@@ -29,7 +29,7 @@ async def create_profile(
 
 @router.get("/me", response_model=ProfileAssessmentResponse)
 async def get_my_profile(
-    user_id: Annotated[str, Header(alias="X-User-ID")],
+    user_id: Annotated[str, Depends(get_current_user_id)],
     use_cases: Annotated[ProfileUseCases, Depends(get_profile_use_cases)],
 ) -> ProfileAssessmentResponse:
     """

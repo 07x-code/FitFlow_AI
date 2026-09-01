@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.ai.agents.single.coach import create_coach_agent
 from app.ai.agents.single.planner import create_training_plan_agent
 from app.application.use_cases import (
+    AuthUseCases,
     CoachUseCases,
     MemoryUseCases,
     ProfileUseCases,
@@ -24,6 +25,51 @@ from app.infrastructure.persistence.postgres.training_plan_repository import (
 from app.infrastructure.persistence.postgres.user_memory_repository import (
     UserMemoryRepository,
 )
+from app.infrastructure.persistence.postgres.user_repository import UserRepository
+from app.ports.sessions import SessionStorePort
+from app.domain.models import UserAccount, UserStatus
+
+
+def create_auth_use_cases(
+    session: AsyncSession,
+    session_store: SessionStorePort,
+) -> AuthUseCases:
+    """
+    创建请求级用户认证用例。
+
+    :param session: 当前请求共享的数据库 Session。
+    :param session_store: 登录会话存储。
+    :return: 用户认证应用用例。
+    """
+    return AuthUseCases(
+        users=UserRepository(session),
+        sessions=session_store,
+    )
+
+
+async def resolve_authenticated_user(
+    session: AsyncSession,
+    session_store: SessionStorePort,
+    token: str,
+) -> UserAccount | None:
+    """
+    根据登录会话解析当前有效用户。
+
+    :param session: 当前请求共享的数据库 Session。
+    :param session_store: 登录会话存储。
+    :param token: 客户端提交的会话令牌。
+    :return: 有效用户账号；会话或账号无效时返回 None。
+    """
+    user_id = await session_store.get_user_id(token)
+    if user_id is None:
+        return None
+
+    user = await UserRepository(session).get_by_id(user_id)
+    if user is not None and user.status == UserStatus.ACTIVE:
+        return user
+
+    await session_store.delete(token)
+    return None
 from app.infrastructure.persistence.postgres.workout_session_repository import (
     WorkoutSessionRepository,
 )

@@ -8,6 +8,7 @@ from app.domain.models.plan import TrainingPlanDraft
 from app.domain.models.profile import FitnessProfileCreate
 from app.domain.models.proposal import TrainingPlanProposalResponse
 from app.domain.models.report import WeeklyReportResponse
+from app.domain.models.user import UserAccount
 from app.domain.models.workout import WorkoutSessionCreate
 
 
@@ -29,6 +30,7 @@ def test_model_groups_have_independent_modules() -> None:
         "profile.py",
         "proposal.py",
         "report.py",
+        "user.py",
         "workout.py",
     }
 
@@ -47,6 +49,7 @@ def test_compatibility_exports_reference_split_model_classes() -> None:
     assert models.UserMemoryCreate is UserMemoryCreate
     assert models.WeeklyReportResponse is WeeklyReportResponse
     assert models.CoachChatRequest is CoachChatRequest
+    assert models.UserAccount is UserAccount
 
 
 def test_leaf_model_modules_do_not_depend_on_other_model_groups() -> None:
@@ -56,6 +59,7 @@ def test_leaf_model_modules_do_not_depend_on_other_model_groups() -> None:
         "working_memory.py",
         "plan.py",
         "profile.py",
+        "user.py",
         "workout.py",
     }
     violations: list[str] = []

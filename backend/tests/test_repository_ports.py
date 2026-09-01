@@ -3,10 +3,32 @@ from inspect import iscoroutinefunction, signature
 from app.ports.repositories import (
     ProfileRepositoryPort,
     TrainingPlanRepositoryPort,
+    UserRepositoryPort,
     UserMemoryRepositoryPort,
     TrainingPlanProposalRepositoryPort,
     WorkoutSessionRepositoryPort,
 )
+
+
+def test_user_repository_port_matches_async_contract() -> None:
+    """
+    验证用户账号仓储端口提供完整的异步接口。
+
+    :return: 无返回值。
+    """
+    method_names = (
+        "create",
+        "get_by_id",
+        "get_by_email",
+        "get_authentication_by_email",
+        "mark_login",
+        "disable",
+    )
+
+    assert all(
+        iscoroutinefunction(getattr(UserRepositoryPort, method_name))
+        for method_name in method_names
+    )
 
 
 def test_training_plan_repository_port_matches_async_contract() -> None:

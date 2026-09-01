@@ -2,18 +2,28 @@ import {
   ArrowRight,
   CheckCircle2,
   Dumbbell,
-  Eye,
   LockKeyhole,
   Mail,
   ShieldCheck,
   Sparkles,
 } from 'lucide-react';
-import { Link, useNavigate } from 'react-router';
+import { useState } from 'react';
+import { Link, Navigate, useLocation, useNavigate } from 'react-router';
 
+import { FitFlowApiError } from '../api/client';
+import { useAuth } from '../auth';
 import { Button } from '../components/ui';
 
 export function LoginPage() {
+  const { user, loading, login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  if (!loading && user !== null) {
+    return <Navigate replace to="/app" />;
+  }
 
   return (
     <main className="auth-page">
@@ -80,7 +90,24 @@ export function LoginPage() {
             className="auth-form"
             onSubmit={(event) => {
               event.preventDefault();
-              navigate('/app');
+              const data = new FormData(event.currentTarget);
+              setBusy(true);
+              setError('');
+              void login(
+                String(data.get('email') ?? ''),
+                String(data.get('password') ?? ''),
+              )
+                .then(() => {
+                  const destination =
+                    typeof location.state?.from === 'string'
+                      ? location.state.from
+                      : '/app';
+                  navigate(destination, { replace: true });
+                })
+                .catch((requestError: unknown) => {
+                  setError(describeLoginError(requestError));
+                })
+                .finally(() => setBusy(false));
             }}>
             <label>
               <span>邮箱</span>
@@ -88,29 +115,30 @@ export function LoginPage() {
                 <Mail aria-hidden="true" size={18} />
                 <input
                   autoComplete="email"
-                  defaultValue="alex@fitflow.ai"
                   inputMode="email"
+                  maxLength={320}
+                  name="email"
+                  required
                   type="email"
                 />
               </span>
             </label>
             <label>
-              <span className="label-row">
-                密码
-                <button type="button">忘记密码？</button>
-              </span>
+              <span>密码</span>
               <span className="field">
                 <LockKeyhole aria-hidden="true" size={18} />
                 <input
                   autoComplete="current-password"
-                  defaultValue="fitflow-demo"
+                  name="password"
+                  maxLength={128}
+                  required
                   type="password"
                 />
-                <Eye aria-hidden="true" size={18} />
               </span>
             </label>
-            <Button fullWidth icon={ArrowRight} type="submit">
-              进入 FitFlow
+            {error ? <p className="auth-form__error" role="alert">{error}</p> : null}
+            <Button disabled={busy} fullWidth icon={ArrowRight} type="submit">
+              {busy ? '正在登录…' : '进入 FitFlow'}
             </Button>
           </form>
 
@@ -127,7 +155,7 @@ export function LoginPage() {
 
           <p className="auth-signup">
             第一次使用？
-            <Link to="/profile-setup">创建训练画像</Link>
+            <Link to="/register">创建账号</Link>
           </p>
           <p className="safety-note">
             FitFlow 不替代医疗诊断。出现疼痛或明显不适时，请停止训练并咨询专业人士。
@@ -136,4 +164,11 @@ export function LoginPage() {
       </section>
     </main>
   );
+}
+
+function describeLoginError(error: unknown) {
+  if (error instanceof FitFlowApiError && typeof error.detail === 'string') {
+    return error.detail;
+  }
+  return '登录暂时不可用，请稍后重试。';
 }

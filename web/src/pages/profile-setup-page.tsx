@@ -2,14 +2,29 @@ import { ArrowRight, Dumbbell, ShieldCheck } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 
+import { FitFlowApiError, fitFlowApi } from '../api/client';
+import { useAuth } from '../auth';
 import { Button, Card, Chip, ProgressBar } from '../components/ui';
 
 const goals = ['增肌', '减脂', '保持健康'];
 const frequencies = ['每周 2 天', '每周 3 天', '每周 4 天'];
+const goalValues = {
+  增肌: 'muscle_gain',
+  减脂: 'fat_loss',
+  保持健康: 'general_fitness',
+} as const;
 
 export function ProfileSetupPage() {
   const [goal, setGoal] = useState('增肌');
   const [frequency, setFrequency] = useState('每周 3 天');
+  const [sex, setSex] = useState<'male' | 'female'>('male');
+  const [age, setAge] = useState(28);
+  const [height, setHeight] = useState(175);
+  const [weight, setWeight] = useState(70);
+  const [minutes, setMinutes] = useState(60);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   return (
@@ -24,8 +39,8 @@ export function ProfileSetupPage() {
             <small>智能教练</small>
           </span>
         </Link>
-        <Link className="text-link" to="/">
-          返回登录
+        <Link className="text-link" to="/app">
+          稍后设置
         </Link>
       </header>
 
@@ -75,20 +90,73 @@ export function ProfileSetupPage() {
             </div>
             <div className="form-grid">
               <label>
+                <span>年龄</span>
+                <span className="unit-field">
+                  <input
+                    max="80"
+                    min="16"
+                    onChange={(event) => setAge(Number(event.target.value))}
+                    type="number"
+                    value={age}
+                  />
+                  <em>岁</em>
+                </span>
+              </label>
+              <label>
+                <span>生理性别</span>
+                <select
+                  className="profile-select"
+                  onChange={(event) => setSex(event.target.value as 'male' | 'female')}
+                  value={sex}>
+                  <option value="male">男</option>
+                  <option value="female">女</option>
+                </select>
+              </label>
+              <label>
                 <span>身高</span>
                 <span className="unit-field">
-                  <input defaultValue="175" inputMode="numeric" />
+                  <input
+                    max="230"
+                    min="120"
+                    onChange={(event) => setHeight(Number(event.target.value))}
+                    type="number"
+                    value={height}
+                  />
                   <em>cm</em>
                 </span>
               </label>
               <label>
                 <span>体重</span>
                 <span className="unit-field">
-                  <input defaultValue="70" inputMode="numeric" />
+                  <input
+                    max="250"
+                    min="35"
+                    onChange={(event) => setWeight(Number(event.target.value))}
+                    step="0.1"
+                    type="number"
+                    value={weight}
+                  />
                   <em>kg</em>
                 </span>
               </label>
             </div>
+          </div>
+
+          <div className="form-section">
+            <div><p className="eyebrow">04</p><h2>单次训练时长</h2></div>
+            <label>
+              <span className="unit-field">
+                <input
+                  max="120"
+                  min="30"
+                  onChange={(event) => setMinutes(Number(event.target.value))}
+                  step="5"
+                  type="number"
+                  value={minutes}
+                />
+                <em>分钟</em>
+              </span>
+            </label>
           </div>
 
           <div className="form-section">
@@ -119,12 +187,37 @@ export function ProfileSetupPage() {
             <ArrowRight size={19} />
           </button>
 
+          {error ? <p className="auth-form__error" role="alert">{error}</p> : null}
           <Button
+            disabled={busy}
             fullWidth
             icon={ArrowRight}
-            onClick={() => navigate('/app')}>
-            保存并生成计划
+            onClick={() => {
+              setBusy(true);
+              setError('');
+              void fitFlowApi.createProfile({
+                age,
+                sex,
+                height_cm: height,
+                weight_kg: weight,
+                goal: goalValues[goal as keyof typeof goalValues],
+                sessions_per_week: Number(frequency.match(/\d/)?.[0] ?? 3),
+                session_minutes: minutes,
+                health_flags: [],
+              })
+                .then(() => navigate('/app/coach'))
+                .catch((requestError: unknown) => {
+                  setError(
+                    requestError instanceof FitFlowApiError && typeof requestError.detail === 'string'
+                      ? requestError.detail
+                      : '画像保存失败，请检查输入后重试。',
+                  );
+                })
+                .finally(() => setBusy(false));
+            }}>
+            {busy ? '正在保存…' : '保存并进入 AI 教练'}
           </Button>
+          <p className="setup-account-note">当前账号：{user?.display_name}</p>
         </Card>
       </section>
     </main>

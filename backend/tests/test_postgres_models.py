@@ -4,11 +4,57 @@ from sqlalchemy.dialects.postgresql import JSONB
 from app.infrastructure.persistence.postgres.base import Base
 from app.infrastructure.persistence.postgres.models import (
     FitnessProfileRecord,
+    UserRecord,
     UserMemoryRecord,
     TrainingPlanRecord,
     TrainingPlanProposalRecord,
     WorkoutSessionRecord,
 )
+
+
+def test_user_table_metadata():
+    """
+    验证用户表包含登录、状态和审计字段。
+
+    :return: 无返回值。
+    """
+    table = Base.metadata.tables["users"]
+
+    assert UserRecord.__table__ is table
+    assert set(table.columns.keys()) == {
+        "id",
+        "email",
+        "email_normalized",
+        "password_hash",
+        "display_name",
+        "status",
+        "email_verified_at",
+        "created_at",
+        "updated_at",
+        "last_login_at",
+    }
+    assert table.c.id.primary_key is True
+    assert table.c.email_normalized.nullable is False
+    assert table.c.password_hash.nullable is False
+
+    check_names = {
+        constraint.name
+        for constraint in table.constraints
+        if isinstance(constraint, CheckConstraint)
+    }
+    unique_names = {
+        constraint.name
+        for constraint in table.constraints
+        if isinstance(constraint, UniqueConstraint)
+    }
+
+    assert check_names == {
+        "ck_users_status_allowed",
+        "ck_users_email_length",
+        "ck_users_normalized_email_length",
+        "ck_users_display_name_length",
+    }
+    assert unique_names == {"uq_users_email_normalized"}
 
 
 def test_fitness_profile_table_metadata():

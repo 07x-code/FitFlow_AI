@@ -23,6 +23,7 @@ import {
   type ProposalDecision,
   type TrainingPlanProposalResponse,
 } from '../api/client';
+import { useAuth } from '../auth';
 import { Button, Card, Chip, PageHeader } from '../components/ui';
 import {
   translateDayName,
@@ -44,8 +45,6 @@ type RequestFailure = {
   question: string;
   message: string;
 };
-
-const USER_ID = 'demo-user';
 
 const initialMessages: Message[] = [
   {
@@ -85,7 +84,7 @@ function isApprovalRequest(message: string) {
 function describeError(error: unknown) {
   if (error instanceof FitFlowApiError) {
     if (error.status === 404) {
-      return `后端未找到 ${USER_ID} 的用户画像。请先在 React PWA 的用户画像页面保存该用户画像。`;
+      return '当前账号还没有训练画像，请先在个人中心完成画像设置。';
     }
 
     if (error.status === 422) {
@@ -107,6 +106,7 @@ function describeError(error: unknown) {
 }
 
 export function CoachPage() {
+  const { user } = useAuth();
   const [messages, setMessages] = useState(initialMessages);
   const [draft, setDraft] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -131,7 +131,7 @@ export function CoachPage() {
           setConnection('online');
         }
 
-        return fitFlowApi.listTrainingPlanProposals(USER_ID);
+        return fitFlowApi.listTrainingPlanProposals();
       })
       .then((response) => {
         if (active) {
@@ -209,7 +209,7 @@ export function CoachPage() {
     setIsSending(true);
 
     try {
-      const response = await fitFlowApi.chatWithCoach(USER_ID, content);
+      const response = await fitFlowApi.chatWithCoach(content);
       setMessages((current) => [
         ...current,
         {
@@ -282,7 +282,6 @@ export function CoachPage() {
 
     try {
       const created = await fitFlowApi.createTrainingPlanProposal(
-        USER_ID,
         requestText,
       );
       setProposal(created);
@@ -319,7 +318,6 @@ export function CoachPage() {
 
     try {
       const revised = await fitFlowApi.reviseTrainingPlanProposal(
-        USER_ID,
         proposal.id,
         feedback,
       );
@@ -351,7 +349,6 @@ export function CoachPage() {
 
     try {
       const decided = await fitFlowApi.decideTrainingPlanProposal(
-        USER_ID,
         proposal.id,
         decision,
       );
@@ -401,7 +398,7 @@ export function CoachPage() {
             <Layers3 size={19} />
             <span>
               <strong>后端动态加载训练上下文</strong>
-              用户 {USER_ID} · 画像 · 最新计划 · 长期记忆 · 本地知识库
+              {user?.display_name} · 画像 · 最新计划 · 长期记忆 · 本地知识库
             </span>
           </div>
 
@@ -556,7 +553,7 @@ export function CoachPage() {
             </button>
           </form>
           <p className="composer-help">
-            Enter 发送，Shift + Enter 换行 · 当前用户：{USER_ID}
+            Enter 发送，Shift + Enter 换行 · 当前账号：{user?.display_name}
           </p>
         </section>
 
@@ -569,7 +566,7 @@ export function CoachPage() {
             <h3>回答由后端生成</h3>
             <ul>
               <li>POST /api/coach/chat</li>
-              <li>X-User-ID: {USER_ID}</li>
+              <li>HttpOnly Cookie 登录会话</li>
               <li>模型与 Key 使用后端配置</li>
               <li>前端不保存千问 Key</li>
             </ul>
@@ -745,7 +742,7 @@ function ResponseEvidence({ response }: { response: CoachChatResponse }) {
   const [deletedMemoryIds, setDeletedMemoryIds] = useState<number[]>([]);
 
   const deleteMemory = async (memoryId: number) => {
-    await fitFlowApi.deleteMemory(USER_ID, memoryId);
+    await fitFlowApi.deleteMemory(memoryId);
     setDeletedMemoryIds((current) => [...current, memoryId]);
   };
 

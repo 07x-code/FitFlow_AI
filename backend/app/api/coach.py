@@ -2,7 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Header
 
-from app.api.dependencies import get_coach_use_cases
+from app.api.dependencies import get_coach_use_cases, get_current_user_id
 from app.application.use_cases.coach import CoachUseCases
 from app.domain.models import CoachChatRequest, CoachChatResponse
 
@@ -13,7 +13,7 @@ router = APIRouter(prefix="/api/coach", tags=["coach"])
 @router.post("/chat", response_model=CoachChatResponse)
 async def chat_with_coach(
     request: CoachChatRequest,
-    user_id: Annotated[str, Header(alias="X-User-ID")],
+    user_id: Annotated[str, Depends(get_current_user_id)],
     session_id: Annotated[
         str,
         Header(alias="X-Session-ID", min_length=1, max_length=128),

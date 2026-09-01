@@ -177,6 +177,7 @@ def test_postgres_repositories_are_grouped_under_persistence() -> None:
         "profile_repository.py",
         "proposal_repository.py",
         "training_plan_repository.py",
+        "user_repository.py",
         "user_memory_repository.py",
         "workout_session_repository.py",
     }

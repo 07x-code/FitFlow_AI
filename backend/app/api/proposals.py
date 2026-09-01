@@ -1,8 +1,8 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, status
+from fastapi import APIRouter, Depends, status
 
-from app.api.dependencies import get_proposal_use_cases
+from app.api.dependencies import get_current_user_id, get_proposal_use_cases
 from app.application.use_cases.proposals import ProposalUseCases
 from app.domain.models import (
     ManualTrainingPlanProposalRequest,
@@ -23,7 +23,7 @@ router = APIRouter(prefix="/api/proposals", tags=["proposals"])
     status_code=status.HTTP_201_CREATED,
 )
 async def create_training_plan_proposal(
-    user_id: Annotated[str, Header(alias="X-User-ID")],
+    user_id: Annotated[str, Depends(get_current_user_id)],
     use_cases: Annotated[ProposalUseCases, Depends(get_proposal_use_cases)],
     request: TrainingPlanProposalCreateRequest | None = None,
 ) -> TrainingPlanProposalResponse:
@@ -48,7 +48,7 @@ async def create_training_plan_proposal(
 )
 async def create_manual_training_plan_proposal(
     request: ManualTrainingPlanProposalRequest,
-    user_id: Annotated[str, Header(alias="X-User-ID")],
+    user_id: Annotated[str, Depends(get_current_user_id)],
     use_cases: Annotated[ProposalUseCases, Depends(get_proposal_use_cases)],
 ) -> TrainingPlanProposalResponse:
     """
@@ -64,7 +64,7 @@ async def create_manual_training_plan_proposal(
 
 @router.get("", response_model=ProposalListResponse)
 async def list_proposals(
-    user_id: Annotated[str, Header(alias="X-User-ID")],
+    user_id: Annotated[str, Depends(get_current_user_id)],
     use_cases: Annotated[ProposalUseCases, Depends(get_proposal_use_cases)],
 ) -> ProposalListResponse:
     return await use_cases.list(user_id)
@@ -73,7 +73,7 @@ async def list_proposals(
 @router.get("/{proposal_id}", response_model=TrainingPlanProposalResponse)
 async def get_proposal(
     proposal_id: int,
-    user_id: Annotated[str, Header(alias="X-User-ID")],
+    user_id: Annotated[str, Depends(get_current_user_id)],
     use_cases: Annotated[ProposalUseCases, Depends(get_proposal_use_cases)],
 ) -> TrainingPlanProposalResponse:
     return await use_cases.get(user_id, proposal_id)
@@ -83,7 +83,7 @@ async def get_proposal(
 async def decide_proposal(
     proposal_id: int,
     request: ProposalDecisionRequest,
-    user_id: Annotated[str, Header(alias="X-User-ID")],
+    user_id: Annotated[str, Depends(get_current_user_id)],
     use_cases: Annotated[ProposalUseCases, Depends(get_proposal_use_cases)],
 ) -> TrainingPlanProposalResponse:
     return await use_cases.decide(user_id, proposal_id, request)
@@ -97,7 +97,7 @@ async def decide_proposal(
 async def revise_proposal(
     proposal_id: int,
     request: ProposalRevisionRequest,
-    user_id: Annotated[str, Header(alias="X-User-ID")],
+    user_id: Annotated[str, Depends(get_current_user_id)],
     use_cases: Annotated[ProposalUseCases, Depends(get_proposal_use_cases)],
 ) -> TrainingPlanProposalResponse:
     """

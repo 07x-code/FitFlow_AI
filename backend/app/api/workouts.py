@@ -1,8 +1,8 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, status
+from fastapi import APIRouter, Depends, status
 
-from app.api.dependencies import get_workout_use_cases
+from app.api.dependencies import get_current_user_id, get_workout_use_cases
 from app.application.use_cases.workouts import WorkoutUseCases
 from app.domain.models import (
     WorkoutHistoryResponse,
@@ -22,7 +22,7 @@ router = APIRouter(prefix="/api/workouts", tags=["workouts"])
 async def create_workout_session(
     plan_id: int,
     session: WorkoutSessionCreate,
-    user_id: Annotated[str, Header(alias="X-User-ID")],
+    user_id: Annotated[str, Depends(get_current_user_id)],
     use_cases: Annotated[WorkoutUseCases, Depends(get_workout_use_cases)],
 ) -> WorkoutSessionResponse:
     return await use_cases.create_session(user_id, plan_id, session)
@@ -30,7 +30,7 @@ async def create_workout_session(
 
 @router.get("/history", response_model=WorkoutHistoryResponse)
 async def list_workout_history(
-    user_id: Annotated[str, Header(alias="X-User-ID")],
+    user_id: Annotated[str, Depends(get_current_user_id)],
     use_cases: Annotated[WorkoutUseCases, Depends(get_workout_use_cases)],
     plan_id: int | None = None,
 ) -> WorkoutHistoryResponse:
